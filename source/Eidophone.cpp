@@ -379,10 +379,13 @@ void EidophonePlugin::drawSplat( int width, int height, int count )
 	const float sx = static_cast< float >( 2.0 * frame.plateScale / width );
 	const float sy = static_cast< float >( 2.0 * frame.plateScale / height );
 	uniform( splatShader, "Scale", sx, sy );
+	//A grain under a pixel is a one-pixel disc at its share of the area, so it
+	//still moves smoothly; Raster is whole and clears the disc's edge.
 	const double size   = frame.pointSize;
-	const double actual = std::max( size, 1.0 );
-	uniform( splatShader, "PointSize", static_cast< float >( actual ) );
-	uniform( splatShader, "Weight", static_cast< float >( ( size / actual ) * ( size / actual ) ) );
+	const double disc   = std::max( size, 1.0 );
+	uniform( splatShader, "PointSize", static_cast< float >( disc ) );
+	uniform( splatShader, "Raster", static_cast< float >( std::ceil( disc ) + 2.0 ) );
+	uniform( splatShader, "Weight", static_cast< float >( ( size / disc ) * ( size / disc ) ) );
 	uniform( splatShader, "Hooks", hooks );
 	glEnable( GL_PROGRAM_POINT_SIZE );
 	setAdditiveBlend();
@@ -543,7 +546,12 @@ FFResult EidophonePlugin::ProcessOpenGL( ProcessOpenGLStruct* pgl )
 			bins[ i ] = info->elements[ static_cast< size_t >( i ) ].value;
 	}
 	const BinLaw law = static_cast< BinLaw >( OptionIndex( params[ PT_BIN_LAW ], static_cast< int >( BinLaw::Count ) ) );
-	frame.drive      = audio.Update( now, bins, binCount, GainFromParam( params[ PT_GAIN ] ), ClarityFromParam( params[ PT_CLARITY ] ), law );
+	frame.drive      = audio.Update( now, bins, binCount, ClarityFromParam( params[ PT_CLARITY ] ), law );
+	//Gain is the steady peak acceleration the loudest recent level gives at
+	//this frequency, so a note between modes shakes the plate as visibly as
+	//one on a mode: the force is what it takes (Audio.h).
+	frame.peakPerNewton = plate.PeakPerNewton( frame.drive.omega );
+	frame.drive.F0      = frame.peakPerNewton > 0.0 ? GainFromParam( params[ PT_GAIN ] ) * kGravity * frame.drive.relative / frame.peakPerNewton : 0.0;
 	plate.Advance( dt, frame.drive.F0, frame.drive.omega );
 
 	const int modeCount = std::min( plate.Count(), shaders::kMaxModes );

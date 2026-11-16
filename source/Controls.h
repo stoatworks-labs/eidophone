@@ -138,8 +138,11 @@ double DriveAtFromParam( float value );///< fraction of the half-width along +x
 float ParamFromDriveAt( double fraction );
 double DampingFromParam( float value );///< Q
 float ParamFromDamping( double q );
-double GainFromParam( float value );///< N at a full-scale sine
-float ParamFromGain( double newtons );
+/// Gain: the steady-state peak acceleration over the plate, in g, that the
+/// loudest recent level gives at the current frequency (0.5-40, geometric).
+constexpr double kDefaultGain = 12.0;
+double GainFromParam( float value );
+float ParamFromGain( double g );
 double ClarityFromParam( float value );///< earshot's NSDF threshold
 float ParamFromClarity( double clarity );
 int AmountFromParam( float value );///< grains

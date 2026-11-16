@@ -34,7 +34,8 @@ constexpr double kThickLow = 0.3e-3, kThickHigh = 3.0e-3;
 constexpr double kDriveHigh = 0.8;
 //Q: a sand-loaded plate on a driver. An assumption; nothing is cited for it.
 constexpr double kQLow = 5.0, kQHigh = 500.0;
-constexpr double kGainLow = 0.01, kGainHigh = 30.0;
+//Gain: the steady peak acceleration, in g, at the loudest recent level.
+constexpr double kGainLow = 0.5, kGainHigh = 40.0;
 constexpr double kClarityLow = 0.5, kClarityHigh = 0.99;
 constexpr double kAmountLow = 1024.0, kAmountHigh = static_cast< double >( kMaxGrains );
 constexpr double kHopLow = 0.25, kHopHigh = 4.0;
@@ -75,7 +76,7 @@ ControlInfo event( unsigned int id, const char* name, const char* group )
 //---------------------------------------------------------------------------
 const ControlInfo kTable[] = {
 	option( PT_SHAPE, "Shape", "Plate", 0.0f, kShapeNames, static_cast< int >( Shape::Count ) ),
-	standard( PT_SIZE, "Size", "Plate", ParamFromSize( 0.30 ) ),
+	standard( PT_SIZE, "Size", "Plate", ParamFromSize( 0.40 ) ),
 	standard( PT_THICKNESS, "Thickness", "Plate", ParamFromThickness( 1.0e-3 ) ),
 	option( PT_MATERIAL, "Material", "Plate", 0.0f, kMaterialNames, static_cast< int >( Material::Count ) ),
 	standard( PT_DRIVE_AT, "Drive At", "Plate", ParamFromDriveAt( 0.0 ) ),
@@ -83,7 +84,7 @@ const ControlInfo kTable[] = {
 
 	{ PT_DEVICE, "Device", "Audio", Kind::Device, 0.0f, nullptr, kDeviceElements },
 	event( PT_RESCAN, "Rescan", "Audio" ),
-	standard( PT_GAIN, "Gain", "Audio", ParamFromGain( 2.0 ) ),
+	standard( PT_GAIN, "Gain", "Audio", ParamFromGain( kDefaultGain ) ),
 	standard( PT_CLARITY, "Clarity", "Audio", ParamFromClarity( 0.80 ) ),
 	option( PT_BIN_LAW, "Bin Law", "Audio", 0.0f, kBinLawNames, static_cast< int >( BinLaw::Count ) ),
 	{ PT_AUDIO, "Audio", "Audio", Kind::Buffer, 0.0f, nullptr, 0 },
@@ -177,9 +178,9 @@ double GainFromParam( float v )
 {
 	return geometric( v, kGainLow, kGainHigh );
 }
-float ParamFromGain( double n )
+float ParamFromGain( double g )
 {
-	return inverseGeometric( n, kGainLow, kGainHigh );
+	return inverseGeometric( g, kGainLow, kGainHigh );
 }
 double ClarityFromParam( float v )
 {

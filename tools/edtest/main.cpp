@@ -1317,11 +1317,13 @@ int main( int argc, char** argv )
 			else if( writePng( outPath, width, height, rig.Output() ) )
 			{
 				const FrameData& fd = rig.plugin.LastFrame();
-				std::printf( "wrote %s -- %dx%d, %d frames at %g fps (%.2f s); audio %s; drive %.1f Hz, %.3f N (%s); %d grains, %u substeps run\n",
+				std::printf( "wrote %s -- %dx%d, %d frames at %g fps (%.2f s); audio %s; drive %.1f Hz (%s), loudness %.1f dBFS, %.2f of its peak, "
+				             "%.4f N; %d grains, %u substeps run\n",
 				             outPath.c_str(), width, height, frames, fps, frames / fps,
 				             !wavPath.empty() ? wavPath.c_str() : ( toneHz > 0.0 ? fmt( "a %.2f Hz tone", toneHz ).c_str() : "none" ), fd.drive.hz,
-				             fd.drive.F0, fd.drive.fromDevice ? "pitch" : ( fd.drive.note ? "host bins, no pitch" : "no note" ), fd.grains,
-				             rig.plugin.StepCounter() );
+				             fd.drive.fromDevice ? ( fd.drive.note ? "pitch" : ( fd.drive.seeded ? "a partial, no pitch yet" : "held" ) )
+				                                 : ( fd.drive.note ? "host bins, no pitch" : "no note" ),
+				             20.0 * std::log10( std::max( fd.drive.loudness, 1e-10 ) ), fd.drive.relative, fd.drive.F0, fd.grains, rig.plugin.StepCounter() );
 			}
 			else
 				result = 1;

@@ -45,20 +45,41 @@ double BinHz( int j, BinLaw law, double sampleRate, int bins )
 	return u * nyquist;
 }
 
-Drive DriveFrom( const earshot::Frame& frame, const float* bins, int binCount, double gain, BinLaw law, double previousOmega, int hooks )
+Drive DriveFrom( const earshot::Frame& frame, const float* bins, int binCount, BinLaw law, double previousOmega, int hooks )
 {
 	Drive d;
 	d.omega = previousOmega;
 	if( frame.source == earshot::Source::Device )
 	{
 		d.fromDevice = true;
+		//The loudness: the band envelopes' RMS, voiced or not.
+		double e2 = 0.0;
+		for( int b = 0; b < frame.bandCount; ++b )
+			e2 += static_cast< double >( frame.bands[ b ].envelope ) * frame.bands[ b ].envelope;
+		d.loudness = std::sqrt( e2 );
 		if( frame.pitch.valid && frame.pitch.voiced && frame.pitch.hz > 0.0f )
 		{
 			d.note  = true;
 			d.hz    = frame.pitch.hz;
 			d.omega = ( hooks & kHookHzAsOmega ) ? d.hz : 2.0 * kPi * d.hz;
-			d.F0    = gain * std::pow( 10.0, frame.pitch.levelDb / 20.0 );
 		}
+		else if( previousOmega <= 0.0 )
+		{
+			//No pitch yet: the strongest partial in the pitch range (loudest first).
+			for( int i = 0; i < frame.partialCount; ++i )
+			{
+				const double hz = frame.partials[ i ].hz;
+				if( hz >= earshot::Config().pitchMinHz && hz <= earshot::Config().pitchMaxHz )
+				{
+					d.seeded = true;
+					d.hz     = hz;
+					d.omega  = 2.0 * kPi * hz;
+					break;
+				}
+			}
+		}
+		else
+			d.hz = previousOmega / ( 2.0 * kPi );
 		return d;
 	}
 	if( frame.source != earshot::Source::Host || bins == nullptr || binCount < 2 )
@@ -78,12 +99,18 @@ Drive DriveFrom( const earshot::Frame& frame, const float* bins, int binCount, d
 	}
 	if( best < 0 )
 		return d;
-	d.note  = true;
-	d.bin   = best;
-	d.hz    = BinHz( best, law, earshot::HostBins().sampleRate, binCount );//44.1 kHz, assumed
-	d.omega = 2.0 * kPi * d.hz;
-	d.F0    = gain * bestValue;
+	d.note     = true;
+	d.bin      = best;
+	d.hz       = BinHz( best, law, earshot::HostBins().sampleRate, binCount );//44.1 kHz, assumed
+	d.omega    = 2.0 * kPi * d.hz;
+	d.loudness = bestValue;
 	return d;
+}
+
+double ReleasePeak( double peak, double loudness, double dt, int hooks )
+{
+	const double released = ( hooks & kHookPeakHeld ) ? peak : peak * std::exp( -std::max( dt, 0.0 ) / kPeakRelease );
+	return std::max( { loudness, released, kPeakFloor } );
 }
 
 void AudioInput::SetBackendFactoryForTest( BackendFactory factory )
@@ -196,7 +223,7 @@ void AudioInput::Feed( const float* interleaved, int frames, int rate, int chann
 	engine->feed( interleaved, frames );
 }
 
-Drive AudioInput::Update( double hostSeconds, const float* bins, int binCount, double gain, double clarity, BinLaw law )
+Drive AudioInput::Update( double hostSeconds, const float* bins, int binCount, double clarity, BinLaw law )
 {
 	if( clarity != appliedClarity )
 	{
@@ -223,8 +250,18 @@ Drive AudioInput::Update( double hostSeconds, const float* bins, int binCount, d
 			diag::info( line );
 		lastState = f.capture;
 	}
-	const Drive d = DriveFrom( f, bins, binCount, gain, law, lastOmega, hooks );
-	lastOmega     = d.omega;
+	//A new stream (another device, a restart) starts without a pitch.
+	if( f.generation != generation )
+	{
+		generation = f.generation;
+		lastOmega  = 0.0;
+	}
+	Drive d   = DriveFrom( f, bins, binCount, law, lastOmega, hooks );
+	lastOmega = d.omega;
+	const double dt = lastSeconds >= 0.0 ? hostSeconds - lastSeconds : 0.0;
+	lastSeconds     = hostSeconds;
+	peak            = ReleasePeak( peak, d.loudness, dt, hooks );
+	d.relative      = d.loudness >= kGate ? d.loudness / peak : 0.0;
 	return d;
 }
 

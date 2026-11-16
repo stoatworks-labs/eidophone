@@ -65,7 +65,8 @@ enum Hook : int
 	kHookLaunchA      = 1 << 6,///< negative: launch speed a/w, not sqrt( a^2 - g^2 )/w
 	kHookPowderDown   = 1 << 7,///< negative: powder carried down the gradient
 	kHookAlphaThrough = 1 << 8,///< negative: the Over passes the clip's alpha through
-	kHookNoClamp      = 1 << 9 ///< diagnostic: no half-texel clamp on a step
+	kHookNoClamp      = 1 << 9,///< diagnostic: no half-texel clamp on a step
+	kHookSplatSwap    = 1 << 13///< negative: sand splatted as powder and powder as sand (1 << 10-12 are Audio's)
 };
 
 constexpr int kFieldSize = 256;///< the lattice, texels a side over [ -1, 1 ]

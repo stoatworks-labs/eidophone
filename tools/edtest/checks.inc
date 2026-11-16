@@ -587,8 +587,8 @@ int runPlate( const Perturb& perturb )
 //===========================================================================
 int runAudio( const Perturb& perturb )
 {
-	std::printf( "\n=== audio: the device path drives at 2 pi x the pitch with Gain x its level; the host's FFT guesses from its strongest bin (never "
-	             "bin 0); the menu\n" );
+	std::printf( "\n=== audio: the device path's frequency is 2 pi x the voiced pitch, held, seeded by the strongest partial; its loudness the band "
+	             "envelopes, over a released running peak; the host's FFT guesses from its strongest bin (never bin 0); the menu\n" );
 	{
 		AudioInput audio;
 		audio.hooks = perturb.hooks;
@@ -641,40 +641,89 @@ int runAudio( const Perturb& perturb )
 					bins[ j ] = 0.02f;
 				bins[ 0 ]    = 0.9f;//DC and the lowest bass: loud, and never the note
 				bins[ peak ] = 0.5f;
-				const Drive d   = audio.Update( 1.0 + peak, bins, 64, 2.0, 0.8, law );
-				const bool ok   = d.note && !d.fromDevice && d.bin == peak && d.hz == BinHz( peak, law ) && d.omega == 2.0 * kPi * d.hz && d.F0 == 2.0 * 0.5;
+				const Drive d = audio.Update( 1.0 + peak, bins, 64, 0.8, law );
+				const bool ok = d.note && !d.fromDevice && d.bin == peak && d.hz == BinHz( peak, law ) && d.omega == 2.0 * kPi * d.hz && d.loudness == 0.5
+				                && d.relative == 1.0;
 				wrong += !ok;
 				if( !ok )
-					what += fmt( " %s bin %d -> bin %d %.1f Hz %.3f N;", law == BinLaw::Log ? "Log" : "Linear", peak, d.bin, d.hz, d.F0 );
+					what += fmt( " %s bin %d -> bin %d %.1f Hz, loudness %.3f, relative %.3f;", law == BinLaw::Log ? "Log" : "Linear", peak, d.bin, d.hz,
+					             d.loudness, d.relative );
 			}
-		Check( wrong == 0, fmt( "the host FFT, bin 0 loudest: the note is the strongest other bin, at its centre under each Bin Law, with Gain x its value "
-		                        "(%d wrong:%s)",
+		Check( wrong == 0, fmt( "the host FFT, bin 0 loudest: the note is the strongest other bin, at its centre under each Bin Law, its value the "
+		                        "loudness (%d wrong:%s)",
 		                        wrong, what.empty() ? " none" : what.c_str() ) );
 	}
 	{
+		//A sine, a step down 20 dB, silence: the frequency from the pitch, the
+		//loudness from the band envelopes, the running peak's release.
 		AudioInput audio;
 		audio.hooks = perturb.hooks;
-		const std::vector< float > tone = sine( 440.0, -20.0, 48000, 1.0 );
+		const int rate = 48000, hop = 800;//60 updates a second
+		const std::vector< float > tone = sine( 440.0, -20.0, rate, 2.0 ), quiet = sine( 440.0, -40.0, rate, 2.0 );
+		const std::vector< float > hush( static_cast< size_t >( rate ) * 2, 0.0f );
+		double t = 0.0, noteOmega = 0.0;
 		Drive d;
-		for( int i = 0; i < 10; ++i )
-		{
-			audio.Feed( &tone[ static_cast< size_t >( i ) * 4800 * 2 ], 4800, 48000, 2 );
-			d = audio.Update( 0.1 * i, nullptr, 0, 2.0, 0.8, BinLaw::Linear );
-		}
-		const earshot::Frame& f = audio.Frame();
-		const double level      = 20.0 * std::log10( d.F0 / 2.0 );
+		auto run = [ & ]( const std::vector< float >& clip, double seconds ) {
+			for( int i = 0; i < static_cast< int >( seconds * rate ) / hop; ++i )
+			{
+				audio.Feed( &clip[ static_cast< size_t >( i % ( clip.size() / 2 / hop ) ) * hop * 2 ], hop, rate, 2 );
+				t += static_cast< double >( hop ) / rate;
+				d = audio.Update( t, nullptr, 0, 0.8, BinLaw::Linear );
+				if( d.note )
+					noteOmega = d.omega;
+			}
+		};
+		run( tone, 1.0 );
+		const double loudDb = 20.0 * std::log10( d.loudness ), toneLoud = d.loudness, stepAt = t;
 		Check( d.note && d.fromDevice && std::fabs( d.hz / 440.0 - 1.0 ) < 0.002 && std::fabs( d.omega / ( 2.0 * kPi * d.hz ) - 1.0 ) < 1e-12
-		           && std::fabs( level - f.pitch.levelDb ) < 1e-6 && std::fabs( level + 20.0 ) < 0.5,
-		       fmt( "a 440 Hz sine at -20 dBFS through feed(): pitch %.2f Hz, w %.2f rad/s (2 pi x %.4f), F0 %.4f N = Gain x 10^( %.2f dB / 20 )", d.hz,
-		            d.omega, d.omega / ( 2.0 * kPi ), d.F0, level ) );
-		const double lastOmega          = d.omega;
-		const std::vector< float > hush = std::vector< float >( 4800 * 2, 0.0f );
-		for( int i = 0; i < 4; ++i )
-		{
-			audio.Feed( hush.data(), 4800, 48000, 2 );
-			d = audio.Update( 1.0 + 0.1 * i, nullptr, 0, 2.0, 0.8, BinLaw::Linear );
-		}
-		Check( !d.note && d.F0 == 0.0 && d.omega == lastOmega, fmt( "then silence: no note, F0 %.3g N, w held at %.2f rad/s", d.F0, d.omega ) );
+		           && std::fabs( loudDb + 20.0 ) < 0.5 && d.relative > 0.99 && d.relative <= 1.0,
+		       fmt( "a 440 Hz sine at -20 dBFS through feed(): pitch %.2f Hz, w = 2 pi x %.4f, loudness %.2f dBFS (the band envelopes' RMS), relative %.4f",
+		            d.hz, d.omega / ( 2.0 * kPi ), loudDb, d.relative ) );
+		run( quiet, 2.0 );
+		const double expected = d.loudness / std::max( { toneLoud * std::exp( -( t - stepAt ) / kPeakRelease ), d.loudness, kPeakFloor } );
+		Check( std::fabs( d.relative / expected - 1.0 ) < 0.02 && std::fabs( d.omega / ( 2.0 * kPi * 440.0 ) - 1.0 ) < 0.002,
+		       fmt( "20 dB down for 2 s: relative %.4f against loudness / ( peak e^( -2 s / %.0f s ) ) = %.4f (a held peak: %.4f); w still 2 pi x %.1f",
+		            d.relative, kPeakRelease, expected, d.loudness / toneLoud, d.omega / ( 2.0 * kPi ) ) );
+		run( hush, 1.0 );
+		Check( !d.note && d.relative == 0.0 && d.omega == noteOmega,
+		       fmt( "then 1 s of silence: no note, loudness %.2g (under the -60 dBFS gate), relative %.3g, w held at the last voiced pitch's, "
+		            "2 pi x %.2f Hz (the tone's tail in the 75 ms window still voices a frame or two)",
+		            d.loudness, d.relative, d.omega / ( 2.0 * kPi ) ) );
+	}
+	{
+		//No pitch yet: the strongest partial stands in, once; a pitch replaces
+		//it; a later unvoiced stretch holds the pitch.
+		AudioInput audio;
+		audio.hooks = perturb.hooks;
+		const int rate = 48000, hop = 800;
+		std::vector< float > chord = sine( 440.0, -26.0, rate, 1.0 );
+		const std::vector< float > upper = sine( 623.0, -20.0, rate, 1.0 ), held = sine( 330.0, -20.0, rate, 1.0 );
+		for( size_t i = 0; i < chord.size(); ++i )
+			chord[ i ] += upper[ i ];
+		double t = 0.0;
+		Drive d;
+		bool everNote = false;
+		auto run = [ & ]( const std::vector< float >& clip, double clarity ) {
+			everNote = false;
+			for( int i = 0; i < rate / hop; ++i )
+			{
+				audio.Feed( &clip[ static_cast< size_t >( i ) * hop * 2 ], hop, rate, 2 );
+				t += static_cast< double >( hop ) / rate;
+				d = audio.Update( t, nullptr, 0, clarity, BinLaw::Linear );
+				everNote = everNote || d.note;
+			}
+		};
+		run( chord, 0.99 );
+		const bool seeded = !everNote && std::fabs( d.omega / ( 2.0 * kPi * 623.0 ) - 1.0 ) < 0.005;
+		const double seedHz = d.omega / ( 2.0 * kPi );
+		run( held, 0.8 );
+		const bool pitched = d.note && std::fabs( d.omega / ( 2.0 * kPi * 330.0 ) - 1.0 ) < 0.002;
+		const double pitchHz = d.omega / ( 2.0 * kPi );
+		run( chord, 0.99 );
+		const bool kept = !everNote && std::fabs( d.omega / ( 2.0 * kPi * 330.0 ) - 1.0 ) < 0.002;
+		Check( seeded && pitched && kept, fmt( "440 + 623 Hz at clarity 0.99 (unvoiced), nothing before: the louder partial, %.2f Hz; a 330 Hz sine then sets "
+		                                       "%.2f Hz; the unvoiced pair again keeps it: %.2f Hz",
+		                                       seedHz, pitchHz, d.omega / ( 2.0 * kPi ) ) );
 	}
 	return Verdict();
 }
@@ -1467,6 +1516,88 @@ struct ToneSource
 	}
 };
 
+//===========================================================================
+// --level (GL): Gain is the plate's steady peak acceleration, on a mode or
+// between two, so a wrong note shows as plainly as a right one.
+//===========================================================================
+/// max |sum_k a_k W_k| per newton over the field lattice's texel centres, in
+/// double from the plate's own steady state (what the GPU's lattice holds).
+double latticePeakPerNewton( const Plate& plate, double omegaD )
+{
+	const modes::Table& table = *plate.TablePtr();
+	const int S = shaders::kFieldSize;
+	std::vector< std::complex< double > > a( static_cast< size_t >( plate.Count() ) );
+	for( int k = 0; k < plate.Count(); ++k )
+		a[ static_cast< size_t >( k ) ] = -omegaD * omegaD * plate.SteadyAmplitude( k, 1.0, omegaD );
+	std::vector< float > lattice( static_cast< size_t >( S ) * S );
+	std::vector< std::complex< double > > sum( static_cast< size_t >( S ) * S );
+	for( int k = 0; k < plate.Count(); ++k )
+	{
+		table.Sample( table.modes[ static_cast< size_t >( k ) ], S, lattice.data() );
+		for( size_t p = 0; p < sum.size(); ++p )
+			sum[ p ] += a[ static_cast< size_t >( k ) ] * static_cast< double >( lattice[ p ] );
+	}
+	double best = 0.0;
+	for( const auto& v : sum )
+		best = std::max( best, std::abs( v ) );
+	return best;
+}
+
+int runLevel( const Perturb& perturb )
+{
+	std::printf( "\n=== level: a steady sine at any pitch settles with the plate's peak acceleration at Gain (in g): on a mode, between two, low, "
+	             "high\n" );
+	const auto table = aluminiumTable( Shape::Square );
+	//The default plate's SS frequencies (the centre drive excites only these).
+	std::vector< double > ss;
+	{
+		const MaterialData& m = MaterialOf( Material::Aluminium );
+		const double L = 0.5 * SizeFromParam( InfoOf( PT_SIZE ).defaultValue );
+		const double c = PlateSpeed( m, ThicknessFromParam( InfoOf( PT_THICKNESS ).defaultValue ) );
+		for( const modes::Mode& mode : table->modes )
+			if( mode.cls == modes::kSS )
+				ss.push_back( mode.Lambda * c / ( L * L ) / ( 2.0 * kPi ) );
+	}
+	const double onMode = defaultToneHz();
+	size_t at = 0;
+	while( at + 1 < ss.size() && ss[ at ] < onMode - 1e-9 )
+		++at;
+	const double between = std::sqrt( ss[ at ] * ss[ at + 1 ] );
+	struct Case
+	{
+		const char* what;
+		double hz;
+	};
+	const Case cases[] = { { "on an SS mode", onMode }, { "midway (geometric) to the next", between }, { "low, near earshot's 40 Hz floor", 45.0 },
+		                   { "high", 1700.0 } };
+	const Raster raster = kRasters.back();//the field lattice is the same at every raster
+	const double gain   = 5.0;
+	for( const Case& c : cases )
+	{
+		Rig rig;
+		if( !startRig( rig, raster.w, raster.h, perturb ) )
+			return 1;
+		ToneSource tone;
+		tone.hz         = c.hz;
+		rig.beforeFrame = [ & ]( int f ) { tone.Before( rig.plugin, f, rig.fps ); };
+		rig.Set( PT_GAIN, ParamFromGain( gain ) );
+		rig.Set( PT_AMOUNT, ParamFromAmount( 1024 ) );
+		if( !rig.Render( 240 ) )//4 s: the slowest free part (the lowest SS mode, Q 40) is down by e^-14
+			return 1;
+		const FrameData& f   = rig.plugin.LastFrame();
+		const double peak    = latticeMax( rig.Field() );
+		const Plate& plate   = rig.plugin.PlateState();
+		const double grid    = plate.PeakPerNewton( f.drive.omega );
+		const double fine    = latticePeakPerNewton( plate, f.drive.omega );
+		const double expect  = gain * kG * f.drive.relative * fine / grid;
+		Check( std::fabs( peak / expect - 1.0 ) < 2e-3 && peak / ( gain * kG ) > 0.9 && peak / ( gain * kG ) < 1.15,
+		       fmt( "%-31s %7.2f Hz: peak %.3f g = %.3f x Gain (%.0f g); the plugin's 25^2 grid against the lattice's 256^2 predicts %.4f x, the "
+		            "lattice holds %.4f of that",
+		            c.what, f.drive.omega / ( 2.0 * kPi ), peak / kG, peak / ( gain * kG ), gain, fine / grid, peak / expect ) );
+	}
+	return Verdict();
+}
+
 int runFreeze( const Perturb& perturb )
 {
 	std::printf( "\n=== freeze: a tone that drives the plate to 0.7 g moves no grain of sand in 10 s; after loud music, silence freezes the figure\n" );
@@ -1480,7 +1611,7 @@ int runFreeze( const Perturb& perturb )
 		tone.hz         = hz;
 		rig.beforeFrame = [ & ]( int f ) { tone.Before( rig.plugin, f, rig.fps ); };
 		rig.Set( PT_GRAIN, static_cast< float >( Grain::Sand ) );
-		const double probeGain = 0.02;
+		const double probeGain = 1.0;
 		rig.Set( PT_GAIN, ParamFromGain( probeGain ) );
 		if( !rig.Render( 60 ) )
 			return 1;
@@ -1510,7 +1641,7 @@ int runFreeze( const Perturb& perturb )
 			}
 		}
 		Check( changed == 0 && peak < kG && peak > 0.5 * kG && unvoiced == 0,
-		       fmt( "%dx%d: a %.1f Hz tone for 10 s, the plate's peak %.3f g (Gain %.3f N): %d grain-readings of %d changed in any bit; %d frames without a "
+		       fmt( "%dx%d: a %.1f Hz tone for 10 s, the plate's peak %.3f g (Gain %.3f g): %d grain-readings of %d changed in any bit; %d frames without a "
 		            "note",
 		            raster.w, raster.h, hz, peak / kG, gain, changed, 6 * count, unvoiced ) );
 
@@ -1645,6 +1776,119 @@ int runAlpha( const Perturb& perturb )
 				notOpaque += out[ i ] != 1.0f;
 			Check( notOpaque == 0, fmt( "%dx%d: the source's alpha is 1 at %zu of %zu pixels", raster.w, raster.h, out.size() / 4 - notOpaque, out.size() / 4 ) );
 		}
+	}
+	return Verdict();
+}
+
+//===========================================================================
+// --splat (GL): the picture is the state. Every grain drawn once, where the
+// state says, sand in r and powder in g, against a CPU rasteriser.
+//===========================================================================
+struct SplatReplica
+{
+	std::vector< double > r, g;
+	std::vector< int > blendsR, blendsG;///< fragments with coverage blended into each pixel
+	double fringe = 0.0;///< weight x pixels in a disc's edge, summed: where a snapped centre can move the coverage
+	int sand = 0, powder = 0;
+};
+
+/// GL's point rule and the splat fragment, in double: a point of Raster px
+/// (whole) covers the pixels whose centres lie inside its square, each by the
+/// disc coverage clamp( PS/2 - r + 1/2 ). Window px = x * PlateScale + W/2.
+SplatReplica splatReplica( const Floats& grains, int count, int W, int H, double plateScale, double pointSize )
+{
+	SplatReplica out;
+	out.r.assign( static_cast< size_t >( W ) * H, 0.0 );
+	out.g.assign( static_cast< size_t >( W ) * H, 0.0 );
+	out.blendsR.assign( static_cast< size_t >( W ) * H, 0 );
+	out.blendsG.assign( static_cast< size_t >( W ) * H, 0 );
+	const double disc   = std::max( pointSize, 1.0 );
+	const double weight = ( pointSize / disc ) * ( pointSize / disc );
+	const double half   = 0.5 * ( std::ceil( disc ) + 2.0 );
+	for( int i = 0; i < count; ++i )
+	{
+		const double px = grains[ static_cast< size_t >( i ) * 4 ] * plateScale + 0.5 * W;
+		const double py = grains[ static_cast< size_t >( i ) * 4 + 1 ] * plateScale + 0.5 * H;
+		const bool isPowder = grains[ static_cast< size_t >( i ) * 4 + 3 ] > 0.5f;
+		( isPowder ? out.powder : out.sand )++;
+		std::vector< double >& target = isPowder ? out.g : out.r;
+		for( int y = static_cast< int >( std::floor( py - half ) ); y <= static_cast< int >( std::ceil( py + half ) ); ++y )
+			for( int x = static_cast< int >( std::floor( px - half ) ); x <= static_cast< int >( std::ceil( px + half ) ); ++x )
+			{
+				const double dx = x + 0.5 - px, dy = y + 0.5 - py;
+				if( std::fabs( dx ) >= half || std::fabs( dy ) >= half || x < 0 || y < 0 || x >= W || y >= H )
+					continue;
+				const double edge = 0.5 * disc - std::hypot( dx, dy ) + 0.5;
+				target[ static_cast< size_t >( y ) * W + x ] += weight * std::clamp( edge, 0.0, 1.0 );
+				if( edge > 0.0 )
+					( isPowder ? out.blendsG : out.blendsR )[ static_cast< size_t >( y ) * W + x ]++;
+				if( edge > -0.05 && edge < 1.05 )
+					out.fringe += weight;
+			}
+	}
+	return out;
+}
+
+int runSplat( const Perturb& perturb )
+{
+	std::printf( "\n=== splat: the density the final pass reads is the grain state rasterised -- every grain once, at its place, sand in r and powder "
+	             "in g -- against a CPU replica of GL's point rule\n" );
+	const auto table = aluminiumTable( Shape::Square );
+	struct Case
+	{
+		int w, h;
+		double pointSize;
+	};
+	std::vector< Case > cases;
+	for( const Raster& raster : kRasters )
+		cases.push_back( { raster.w, raster.h, 0.6 } );//under a pixel: a one-pixel disc at weight PS^2
+	//Grain Size reaches these only at 720 lines and up (0.5 to 4 px at 1080).
+	cases.push_back( { kRasters.front().w, kRasters.front().h, 1.5 } );
+	cases.push_back( { kRasters.front().w, kRasters.front().h, 2.6 } );
+	GLint subpixelBits = 0;
+	glGetIntegerv( GL_SUBPIXEL_BITS, &subpixelBits );
+	const double snap = std::ldexp( 1.0, -std::max( subpixelBits, 4 ) );//GL's floor is 4 bits
+	for( const Case& c : cases )
+	{
+		Rig rig;
+		if( !startRig( rig, c.w, c.h, perturb ) )
+			return 1;
+		rig.Set( PT_GRAIN, static_cast< float >( Grain::Both ) );
+		rig.Set( PT_VIEW, 0.0f );//Fit: the whole plate on the raster
+		rig.Set( PT_GRAIN_SIZE, ParamFromGrainSize( c.pointSize * 1080.0 / c.h ) );
+		setPure( rig, findMode( *table, modes::kSS, 1 ), 3.0 * kG, 2.0 * kPi * 200.0 );
+		if( !rig.Render( 20 ) )//the grains moved off the poured lattice of random numbers, so the test is not of the pour alone
+			return 1;
+		const FrameData& f  = rig.plugin.LastFrame();
+		const Floats grains = rig.Grains(), dens = rig.Density();
+		const SplatReplica cpu = splatReplica( grains, f.grains, c.w, c.h, f.plateScale, f.pointSize );
+		//RG16F blends round each sum to 10 mantissa bits: a pixel blended n
+		//times ends within n 2^-10 of its value (2^-10, not 2^-11, in case the
+		//blender truncates). The software renderer keeps more and lands inside.
+		double gpuR = 0.0, gpuG = 0.0, cpuR = 0.0, cpuG = 0.0, l1 = 0.0, halfR = 0.0, halfG = 0.0;
+		for( size_t p = 0; p < cpu.r.size(); ++p )
+		{
+			gpuR += dens[ p * 4 ];
+			gpuG += dens[ p * 4 + 1 ];
+			cpuR += cpu.r[ p ];
+			cpuG += cpu.g[ p ];
+			halfR += cpu.blendsR[ p ] * cpu.r[ p ] * std::ldexp( 1.0, -10 );
+			halfG += cpu.blendsG[ p ] * cpu.g[ p ] * std::ldexp( 1.0, -10 );
+			l1 += std::fabs( dens[ p * 4 ] - cpu.r[ p ] ) + std::fabs( dens[ p * 4 + 1 ] - cpu.g[ p ] );
+		}
+		const double total = cpuR + cpuG;
+		if( std::getenv( "ED_DEBUG" ) )
+			std::printf( "    gpu r %.3f g %.3f, cpu r %.3f g %.3f (half-float bound %.3f, %.3f); GL_SUBPIXEL_BITS %d\n", gpuR, gpuG, cpuR, cpuG, halfR, halfG,
+			             subpixelBits );
+		const bool massOk = std::fabs( gpuR - cpuR ) <= halfR + 1e-6 * cpuR && std::fabs( gpuG - cpuG ) <= halfG + 1e-6 * cpuG;
+		const double massErr = std::max( std::fabs( gpuR - cpuR ) / halfR, std::fabs( gpuG - cpuG ) / halfG );
+		//A centre snapped to the rasteriser's subpixel grid moves each edge
+		//pixel's coverage by at most the snap.
+		const double allowed = snap * cpu.fringe + halfR + halfG;
+		Check( massOk && l1 <= allowed && cpu.sand > 0 && cpu.powder > 0,
+		       fmt( "%dx%d, %.2f px points: %d sand and %d powder grains; mass in r and g off the replica's by %.2f of the half-float bound; per-pixel |GPU - CPU| summed %.2f "
+		            "(%.3f%% of the mass; allowed %.2f: %d subpixel bits on the disc edges, RG16F's rounding)",
+		            c.w, c.h, f.pointSize, cpu.sand, cpu.powder, massErr, l1, 100.0 * l1 / total, allowed, subpixelBits ) );
 	}
 	return Verdict();
 }
@@ -1903,8 +2147,8 @@ const std::vector< CheckEntry >& checks()
 	static const std::vector< CheckEntry > list = {
 		{ "modes", runModes, true },         { "circle", runCircle, true },   { "plate", runPlate, true },   { "audio", runAudio, true },
 		{ "device", runDevice, false },      { "select", runSelect, false },  { "threshold", runThreshold, false }, { "hop", runHop, false },
-		{ "nodal", runNodal, false },        { "powder", runPowder, false },  { "freeze", runFreeze, false }, { "redraw", runRedraw, false },
-		{ "alpha", runAlpha, false },        { "clock", runClock, false },    { "resize", runResize, false }, { "state", runState, false },
+		{ "nodal", runNodal, false },        { "powder", runPowder, false },  { "level", runLevel, false },    { "freeze", runFreeze, false }, { "redraw", runRedraw, false },
+		{ "alpha", runAlpha, false },        { "splat", runSplat, false },    { "clock", runClock, false },    { "resize", runResize, false }, { "state", runState, false },
 		{ "names", runNames, true },         { "cues", runCues, true },
 	};
 	return list;
@@ -1942,6 +2186,7 @@ int runNegative( bool offlineOnly = false )
 	add( "plate", runPlate, "no rigid-body response", []( Perturb& p ) { p.hooks = kHookDropRigid; } );
 	add( "audio", runAudio, "the pitch in Hz taken as rad/s", []( Perturb& p ) { p.hooks = kHookHzAsOmega; } );
 	add( "audio", runAudio, "the fallback lets bin 0 win", []( Perturb& p ) { p.hooks = kHookBinZero; } );
+	add( "audio", runAudio, "the running peak never released", []( Perturb& p ) { p.hooks = kHookPeakHeld; } );
 	add( "device", runDevice, "the menu values devices by position, not by name", []( Perturb& p ) { p.hooks = kHookMenuByIndex; } );
 	add( "select", runSelect, "the pitch in Hz taken as rad/s", []( Perturb& p ) { p.hooks = kHookHzAsOmega; } );
 	add( "threshold", runThreshold, "grains hop at a > g/2", []( Perturb& p ) { p.hooks = kHookHalfGate; } );
@@ -1949,8 +2194,10 @@ int runNegative( bool offlineOnly = false )
 	add( "hop", runHop, "launch speed a/w, not sqrt( a^2 - g^2 )/w", []( Perturb& p ) { p.hooks = kHookLaunchA; } );
 	add( "nodal", runNodal, "sand drifts up the gradient", []( Perturb& p ) { p.hooks = kHookDriftUp; } );
 	add( "powder", runPowder, "powder carried down the gradient", []( Perturb& p ) { p.hooks = kHookPowderDown; } );
+	add( "level", runLevel, "the force sized by the rigid response alone", []( Perturb& p ) { p.hooks = kHookPeakRigidOnly; } );
 	add( "freeze", runFreeze, "grains hop at a > g/2", []( Perturb& p ) { p.hooks = kHookHalfGate; } );
 	add( "alpha", runAlpha, "the clip's alpha passed through", []( Perturb& p ) { p.hooks = kHookAlphaThrough; } );
+	add( "splat", runSplat, "sand splatted as powder, powder as sand", []( Perturb& p ) { p.hooks = kHookSplatSwap; } );
 	add( "cues", runCues, "ramp every control between keys", []( Perturb& p ) { p.cuesRamp = true; } );
 
 	if( offlineOnly )

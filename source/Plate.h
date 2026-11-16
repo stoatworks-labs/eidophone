@@ -32,7 +32,8 @@ enum PlateHook : int
 {
 	kHookDampingAtDrive = 1 << 0,///< zeta w_d where zeta w_k belongs
 	kHookCouplingOne    = 1 << 1,///< W_k( x_d ) taken as 1 for every mode
-	kHookDropRigid      = 1 << 2 ///< no rigid-body response
+	kHookDropRigid      = 1 << 2,///< no rigid-body response
+	kHookPeakRigidOnly  = 1 << 3 ///< PeakPerNewton from the rigid modes alone
 };
 
 struct PlateConfig
@@ -106,6 +107,12 @@ public:
 	}
 	/// The closed-form steady-state complex amplitude of mode k at this drive.
 	Complex SteadyAmplitude( int k, double F0, double omegaD ) const;
+	/// The steady-state peak acceleration over the plate per newton of drive
+	/// at omegaD, m/s^2/N: max |sum_k a_k W_k( x )| over kPeakGrid^2 points
+	/// spanning the plate, edges and corners included (the free edge is where
+	/// the antinodes crowd). What Gain divides by. 0 when omegaD <= 0.
+	double PeakPerNewton( double omegaD ) const;
+	static constexpr int kPeakGrid = 25;
 	const PlateConfig& Config() const
 	{
 		return config;
@@ -130,6 +137,8 @@ private:
 	double zeta     = 1.0 / 80.0;
 	std::vector< double > omega, coupling, q, v;
 	std::vector< Complex > accel, analytic;
+	std::vector< double > peakGridW;///< W_k at the peak grid's points, k-major
+	int peakPoints = 0;
 	double phase     = 0.0;
 	double lastF0    = 0.0;
 	double lastOmega = 0.0;

@@ -33,6 +33,7 @@ const int kHookLaunchA      = 64;
 const int kHookPowderDown   = 128;
 const int kHookAlphaThrough = 256;
 const int kHookNoClamp      = 512;
+const int kHookSplatSwap    = 8192;
 
 uniform int Hooks;
 
@@ -236,8 +237,8 @@ void main()
 const char* const kSplatVertex = R"(
 uniform sampler2D State;
 uniform vec2 Scale;     //plate units to clip space
-uniform float PointSize;//px
-uniform float Weight;   //a grain's area in pixels per point pixel
+uniform float Raster;   //px, a whole number: the square the point covers
+uniform float Weight;   //a grain's area in pixels per unit disc coverage
 
 out vec2 kind;
 
@@ -246,26 +247,27 @@ void main()
 	ivec2 p      = ivec2( gl_VertexID % kStateSize, gl_VertexID / kStateSize );
 	vec4 s       = texelFetch( State, p, 0 );
 	gl_Position  = vec4( s.xy * Scale, 0.0, 1.0 );
-	gl_PointSize = PointSize;
-	kind         = s.w > 0.5 ? vec2( 0.0, Weight ) : vec2( Weight, 0.0 );
+	gl_PointSize = Raster;
+	kind         = ( s.w > 0.5 ) != hooked( kHookSplatSwap ) ? vec2( 0.0, Weight ) : vec2( Weight, 0.0 );
 }
 )";
 
+//A disc of diameter PointSize with a one-pixel linear edge, inside a point
+//square of Raster px: whole, and wider than the disc and its edge, so neither
+//the driver's rounding of a fractional size nor the square's edge is seen
+//(Apple's GL drew a 2.6 px point as 3: edtest --splat).
 const char* const kSplatFragment = R"(
-uniform float PointSize;
+uniform float PointSize;//px, the disc's diameter, >= 1
+uniform float Raster;
 
 in vec2 kind;
 out vec4 fragColour;
 
 void main()
 {
-	float cover = 1.0;
-	if( PointSize >= 2.0 )
-	{
-		float r = length( gl_PointCoord - vec2( 0.5 ) ) * PointSize;
-		cover   = clamp( 0.5 * PointSize - r + 0.5, 0.0, 1.0 );
-	}
-	fragColour = vec4( kind * cover, 0.0, 0.0 );
+	float r     = length( gl_PointCoord - vec2( 0.5 ) ) * Raster;
+	float cover = clamp( 0.5 * PointSize - r + 0.5, 0.0, 1.0 );
+	fragColour  = vec4( kind * cover, 0.0, 0.0 );
 }
 )";
 

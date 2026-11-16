@@ -47,6 +47,7 @@ struct FrameData
 	double plateScale  = 1.0; ///< px per plate unit
 	double pointSize   = 1.0;
 	bool poured        = false;
+	double peakPerNewton = 0.0;///< Plate::PeakPerNewton at the drive's frequency
 	std::vector< std::complex< float > > coef;///< a_k as uploaded
 };
 
@@ -99,7 +100,7 @@ public:
 	void SetHooksForTest( int bits )
 	{
 		hooks       = bits;
-		plate.hooks = bits & 7;
+		plate.hooks = bits & 15;
 		audio.hooks = bits;
 	}
 	void SetTestDrive( const TestDrive& drive )

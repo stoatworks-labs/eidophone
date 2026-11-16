@@ -9,8 +9,50 @@ namespace eido
 void Plate::SetTable( std::shared_ptr< const modes::Table > newTable )
 {
 	table = std::move( newTable );
+	//The peak grid: the square's kPeakGrid^2 points over [ -1, 1 ]^2, or the
+	//disc's that lie inside it plus as many on the rim.
+	peakGridW.clear();
+	if( table )
+	{
+		std::vector< std::pair< double, double > > points;
+		const bool circle = table->shape == Shape::Circle;
+		for( int j = 0; j < kPeakGrid; ++j )
+			for( int i = 0; i < kPeakGrid; ++i )
+			{
+				const double x = -1.0 + 2.0 * i / ( kPeakGrid - 1 ), y = -1.0 + 2.0 * j / ( kPeakGrid - 1 );
+				if( !circle || x * x + y * y <= 1.0 )
+					points.emplace_back( x, y );
+			}
+		if( circle )
+			for( int i = 0; i < 4 * kPeakGrid; ++i )
+				points.emplace_back( std::cos( 2.0 * kPi * i / ( 4 * kPeakGrid ) ), std::sin( 2.0 * kPi * i / ( 4 * kPeakGrid ) ) );
+		peakPoints = static_cast< int >( points.size() );
+		peakGridW.reserve( table->modes.size() * points.size() );
+		for( const modes::Mode& mode : table->modes )
+			for( const auto& p : points )
+				peakGridW.push_back( table->W( mode, p.first, p.second ) );
+	}
 	recompute();
 	Reset();
+}
+
+double Plate::PeakPerNewton( double omegaD ) const
+{
+	if( omegaD <= 0.0 || peakPoints == 0 )
+		return 0.0;
+	std::vector< Complex > a( static_cast< size_t >( Count() ) );
+	for( int k = 0; k < Count(); ++k )
+		if( omega[ static_cast< size_t >( k ) ] == 0.0 || !( hooks & kHookPeakRigidOnly ) )
+			a[ static_cast< size_t >( k ) ] = -omegaD * omegaD * SteadyAmplitude( k, 1.0, omegaD );//rigid: -w^2 x f/( -w^2 ) = f
+	double best = 0.0;
+	for( int p = 0; p < peakPoints; ++p )
+	{
+		Complex sum( 0.0, 0.0 );
+		for( int k = 0; k < Count(); ++k )
+			sum += a[ static_cast< size_t >( k ) ] * peakGridW[ static_cast< size_t >( k ) * peakPoints + p ];
+		best = std::max( best, std::abs( sum ) );
+	}
+	return best;
 }
 
 void Plate::Configure( const PlateConfig& next )
@@ -56,6 +98,8 @@ Plate::Complex Plate::SteadyAmplitude( int k, double F0, double omegaD ) const
 	const double w  = omega[ static_cast< size_t >( k ) ];
 	const double W  = ( hooks & kHookCouplingOne ) ? 1.0 : coupling[ static_cast< size_t >( k ) ];
 	const double f  = F0 * W / config.mass;
+	if( w == 0.0 && ( hooks & kHookDropRigid ) )
+		return Complex( 0.0, 0.0 );
 	const double zw = ( hooks & kHookDampingAtDrive ) ? zeta * omegaD : zeta * w;
 	return f / Complex( w * w - omegaD * omegaD, 2.0 * zw * omegaD );
 }
