@@ -642,8 +642,11 @@ int runAudio( const Perturb& perturb )
 				bins[ 0 ]    = 0.9f;//DC and the lowest bass: loud, and never the note
 				bins[ peak ] = 0.5f;
 				const Drive d = audio.Update( 1.0 + peak, bins, 64, 0.8, law );
-				const bool ok = d.note && !d.fromDevice && d.bin == peak && d.hz == BinHz( peak, law ) && d.omega == 2.0 * kPi * d.hz && d.loudness == 0.5
-				                && d.relative == 1.0;
+				//The spec's centres, written out here rather than called: 44.1 kHz, 64 bins.
+				const double u      = ( peak + 0.5 ) / 64.0;
+				const double centre = law == BinLaw::Log ? 20.0 * std::pow( 22050.0 / 20.0, u ) : u * 22050.0;
+				const bool ok = d.note && !d.fromDevice && d.bin == peak && std::fabs( d.hz / centre - 1.0 ) < 1e-12 && d.omega == 2.0 * kPi * d.hz
+				                && d.loudness == 0.5 && d.relative == 1.0;
 				wrong += !ok;
 				if( !ok )
 					what += fmt( " %s bin %d -> bin %d %.1f Hz, loudness %.3f, relative %.3f;", law == BinLaw::Log ? "Log" : "Linear", peak, d.bin, d.hz,
@@ -680,10 +683,11 @@ int runAudio( const Perturb& perturb )
 		       fmt( "a 440 Hz sine at -20 dBFS through feed(): pitch %.2f Hz, w = 2 pi x %.4f, loudness %.2f dBFS (the band envelopes' RMS), relative %.4f",
 		            d.hz, d.omega / ( 2.0 * kPi ), loudDb, d.relative ) );
 		run( quiet, 2.0 );
-		const double expected = d.loudness / std::max( { toneLoud * std::exp( -( t - stepAt ) / kPeakRelease ), d.loudness, kPeakFloor } );
+		//8 s, -40 dBFS: the spec's constants, written out (not Audio.h's).
+		const double expected = d.loudness / std::max( { toneLoud * std::exp( -( t - stepAt ) / 8.0 ), d.loudness, 0.01 } );
 		Check( std::fabs( d.relative / expected - 1.0 ) < 0.02 && std::fabs( d.omega / ( 2.0 * kPi * 440.0 ) - 1.0 ) < 0.002,
-		       fmt( "20 dB down for 2 s: relative %.4f against loudness / ( peak e^( -2 s / %.0f s ) ) = %.4f (a held peak: %.4f); w still 2 pi x %.1f",
-		            d.relative, kPeakRelease, expected, d.loudness / toneLoud, d.omega / ( 2.0 * kPi ) ) );
+		       fmt( "20 dB down for 2 s: relative %.4f against loudness / ( peak e^( -2 s / 8 s ) ) = %.4f (a held peak: %.4f); w still 2 pi x %.1f",
+		            d.relative, expected, d.loudness / toneLoud, d.omega / ( 2.0 * kPi ) ) );
 		run( hush, 1.0 );
 		Check( !d.note && d.relative == 0.0 && d.omega == noteOmega,
 		       fmt( "then 1 s of silence: no note, loudness %.2g (under the -60 dBFS gate), relative %.3g, w held at the last voiced pitch's, "
@@ -1262,7 +1266,20 @@ struct Settled
 	int count     = 0;
 	double seconds = 0.0;
 	int moving    = 0;
+	int offPlate  = 0;///< the most grains outside the plate at any readback (the rim reflects: must be 0)
 };
+
+/// Grains outside the plate: the square's [ -1, 1 ]^2, or the unit disc.
+int offPlateCount( const Floats& state, int count, Shape shape )
+{
+	int off = 0;
+	for( int i = 0; i < count; ++i )
+	{
+		const double x = state[ 4 * static_cast< size_t >( i ) ], y = state[ 4 * static_cast< size_t >( i ) + 1 ];
+		off += shape == Shape::Circle ? x * x + y * y > 1.0 + 1e-6 : std::fabs( x ) > 1.0 || std::fabs( y ) > 1.0;
+	}
+	return off;
+}
 
 /// Pure drive on one mode, 32 substeps a frame, until fewer than 0.5 % of the
 /// grains moved over the last 480 substeps (1 s of plate time) or `limit` s.
@@ -1278,8 +1295,9 @@ bool settle( Rig& rig, double limit, Settled& out )
 	{
 		if( !rig.Render( block ) )
 			return false;
-		Floats now  = rig.Grains();
-		out.moving  = movedCount( last, now, out.count );
+		Floats now   = rig.Grains();
+		out.moving   = movedCount( last, now, out.count );
+		out.offPlate = std::max( out.offPlate, offPlateCount( now, out.count, rig.plugin.ModeTable()->shape ) );
 		out.seconds = ( f + block ) * shaders::kMaxSubsteps * shaders::kSubstep;
 		last        = std::move( now );
 		if( out.moving <= out.count / 200 )
@@ -1334,10 +1352,11 @@ int runNodal( const Perturb& perturb )
 				hist[ d < texel ? 0 : d < 2 * texel ? 1 : d < 4 * texel ? 2 : 3 ]++;
 			}
 			const double share = static_cast< double >( on ) / s.count;
-			Check( share >= 0.99 && z.count() > 100, fmt( "%dx%d: %s (lambda %.2f): %.2f%% of %d grains on the nodal lines after %.1f s (%d still moving), %.1f%% "
-			                                              "inside the straight-run distance; <1 texel %d, 1-2 %d, 2-4 %d, more %d",
-			                                              raster.w, raster.h, c.name, table.modes[ static_cast< size_t >( c.k ) ].paper, 100.0 * share, s.count,
-			                                              s.seconds, s.moving, 100.0 * linear / s.count, hist[ 0 ], hist[ 1 ], hist[ 2 ], hist[ 3 ] ) );
+			Check( share >= 0.99 && z.count() > 100 && s.offPlate == 0,
+			       fmt( "%dx%d: %s (lambda %.2f): %.2f%% of %d grains on the nodal lines after %.1f s (%d still moving, %d ever off the plate), %.1f%% "
+			            "inside the straight-run distance; <1 texel %d, 1-2 %d, 2-4 %d, more %d",
+			            raster.w, raster.h, c.name, table.modes[ static_cast< size_t >( c.k ) ].paper, 100.0 * share, s.count, s.seconds, s.moving, s.offPlate,
+			            100.0 * linear / s.count, hist[ 0 ], hist[ 1 ], hist[ 2 ], hist[ 3 ] ) );
 		}
 	return Verdict();
 }
@@ -1843,8 +1862,9 @@ int runSplat( const Perturb& perturb )
 	for( const Raster& raster : kRasters )
 		cases.push_back( { raster.w, raster.h, 0.6 } );//under a pixel: a one-pixel disc at weight PS^2
 	//Grain Size reaches these only at 720 lines and up (0.5 to 4 px at 1080).
-	cases.push_back( { kRasters.front().w, kRasters.front().h, 1.5 } );
-	cases.push_back( { kRasters.front().w, kRasters.front().h, 2.6 } );
+	for( double ps : { 1.5, 2.6 } )
+		if( ps * 1080.0 / kRasters.front().h <= 4.0 )//Grain Size's top, 4 px at 1080
+			cases.push_back( { kRasters.front().w, kRasters.front().h, ps } );
 	GLint subpixelBits = 0;
 	glGetIntegerv( GL_SUBPIXEL_BITS, &subpixelBits );
 	const double snap = std::ldexp( 1.0, -std::max( subpixelBits, 4 ) );//GL's floor is 4 bits

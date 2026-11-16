@@ -37,8 +37,8 @@ class CaptureBackend;
     so at most 40 dB of make-up; nothing under kGate). The plugin turns it
     into a force: Gain is the steady-state peak acceleration, in g, that the
     loudest recent passage gives at the current frequency (Plate::
-    PeakPerNewton). The demo WAVs Resolume ships sit near -40 dBFS and drove
-    nothing under a fixed force (AGENTS.md).
+    PeakPerNewton). Resolume's demo WAVs are quiet (Synth 001 near -41 dBFS)
+    and rarely voiced, and drove nothing under the spec's fixed force (AGENTS.md).
 
     **The menu** (spasis's rules, earshot's INTEGRATING.md recipe): element 0
     "Resolume FFT (no pitch)" = 0, element 1 "System default" =

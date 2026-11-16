@@ -1081,6 +1081,7 @@ int main( int argc, char** argv )
 	std::string clipPath;
 	int debugHooks = 0;
 	int pureMode   = -1;//--pure K G: mode K of the table at G g, the TestDrive (for looking at one mode)
+	int hostBin    = -1;//--bins J: the host FFT alone, a peak at bin J
 	double pureG   = 0.0;
 
 	for( int i = 1; i < argc; ++i )
@@ -1103,6 +1104,8 @@ int main( int argc, char** argv )
 			             "  --at N \"Name=V\"  (with --out) set it at frame N instead; an event is released the frame after\n"
 			             "  --hooks N         hook bits on the plain render (negative controls; for looking only)\n"
 			             "  --pure K G        the plain render with mode K of the table held at G g peak (200 Hz), no audio\n"
+			             "  --bins J          the plain render on the host FFT: the Audio buffer's bin J at 0.5, bin 0 at 0.9, the rest 0.02\n"
+			             "                    (no device, no feed: what Resolume's FFT alone drives)\n"
 			             "  --list            every parameter and its default\n"
 			             "  --pipe            raw RGBA frames in on stdin, out on stdout\n"
 			             "  --film N          N frames, raw RGBA on stdout\n"
@@ -1124,6 +1127,8 @@ int main( int argc, char** argv )
 		}
 		else if( argument == "--clip" && hasNext )
 			clipPath = argv[ ++i ];
+		else if( argument == "--bins" && hasNext )
+			hostBin = std::atoi( argv[ ++i ] );
 		else if( argument == "--set" && hasNext )
 			settings.push_back( argv[ ++i ] );
 		else if( argument == "--frames" && hasNext )
@@ -1203,7 +1208,7 @@ int main( int argc, char** argv )
 	const bool plain = mode.empty();
 	if( toneGiven && toneHz == 0.0 )
 		toneHz = defaultToneHz();
-	else if( !toneGiven && plain && wavPath.empty() )
+	else if( !toneGiven && plain && wavPath.empty() && hostBin < 0 )
 		toneHz = defaultToneHz();
 	Wav audio;
 	if( !audioFor( wavPath, toneHz, frames / fps + 1.0, audio ) )
@@ -1284,6 +1289,13 @@ int main( int argc, char** argv )
 					std::fprintf( stderr, "--set %s: %s\n", setting.c_str(), error.c_str() );
 					return 2;
 				}
+			}
+			if( hostBin >= 0 )
+			{
+				const int host = rig.plugin.HostIndexOf( PT_AUDIO );
+				for( int j = 0; j < 64; ++j )
+					rig.plugin.SetParamElementValue( static_cast< unsigned int >( host ), static_cast< unsigned int >( j ),
+					                                 j == hostBin ? 0.5f : ( j == 0 ? 0.9f : 0.02f ) );
 			}
 			bool rendered = true;
 			std::vector< std::pair< int, std::string > > release;

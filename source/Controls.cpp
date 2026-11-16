@@ -70,7 +70,7 @@ ControlInfo event( unsigned int id, const char* name, const char* group )
 }
 
 //---------------------------------------------------------------------------
-// The defaults: a 30 cm square of 1 mm aluminium pushed at its centre,
+// The defaults: a 40 cm square of 1 mm aluminium pushed at its centre,
 // Q 40, 65,536 grains of sand. AGENTS.md ("Decisions") says how each was
 // chosen; the demo-clip pass moved some of them.
 //---------------------------------------------------------------------------
