@@ -395,3 +395,155 @@ grains. One GPU only (an M4 Max); a small GPU or the software renderer is anothe
   reads at a show.
 - **Windows by CI only.** MSVC builds it on GitHub's runner; miniaudio's WASAPI backend has
   never opened a device.
+
+## Browser demo
+
+https://eidophone-demo.stoatworks-labs.com/ (2026-11-18), from `demo/`, deployed by
+`wrangler.toml` (a Worker route: the zone is at Cloudflare's 100 custom domains, so
+`eidophone-demo` is a proxied AAAA `100::` record made through the API) and
+`.github/workflows/deploy.yml` on every push to main. woofer's pattern, itself mirrorball's
+and fountain's.
+
+- **It runs the plugin, it doesn't port it.** `demo/eidophone-core.wasm` is `Eidophone.cpp`
+  and everything it calls (Diag, Controls, Eigen, Modes, Plate, Audio, PassBuffer, Shaders),
+  earshot's snapshot (every `src/*.cpp` but `Miniaudio.cpp`/`MiniaudioImpl.cpp`, with
+  `NoCapture.cpp`: its own `EARSHOT_CAPTURE=OFF` build, so the module has no device backend at
+  all) and the FFGL SDK's plugin classes, FFGLLog, FFGLShader, FFGLFBO, the Scoped* bindings,
+  FFGLScreenQuad and FFGLUtilities, compiled unmodified by emscripten 6.0.5 at -O3
+  (`demo/tools/build-wasm.sh`). The mode solvers, the oscillators, the audio law, the fallback
+  and earshot's pitch tracker are that C++, in double. Left out: `SourcePlugin.cpp` and
+  `EffectPlugin.cpp` (the registrations; the glue constructs the plugin itself). The script
+  fails if a `source/*.cpp` or an earshot `src/*.cpp` it doesn't list appears.
+- **What is the page's**: `demo/wasm/glue.cpp` plays the host (constructs the source or the
+  Over, reads their declarations back through the SDK so the panel is built from them,
+  forwards SetFloatParameter, SetTime, the Audio buffer's elements and ProcessOpenGL as
+  edtest's Rig does, presets the clock to seconds after InitGL as Rig::Init does, and hands
+  the page the harness's accessors: the frame's drive, substeps and grains, the nearest mode
+  the drive point couples to, earshot's state, the plugin's clock and step counter);
+  `demo/wasm/gl_shim.cpp` takes glShaderSource (refusing any text that isn't byte for byte one
+  of the page's seven assemblies of `demo/shaders.js`, then the kit's `port()`),
+  glEnable/glDisable/glIsEnabled (GL_PROGRAM_POINT_SIZE, which WebGL2 lacks; ES sizes a point
+  by the splat's own gl_PointSize) and glTexImage2D (below); the host row; the read-outs'
+  units, the tooltips, the twelve presets (in metres, g, Q, grains and factors, through the
+  plugin's own `ParamFrom*` via `ed_param_from`), the lines under the picture and Diag's log
+  from emscripten's memory file system (`EIDOPHONE_LOG_DIR=/eidophone/logs`). Off the panel:
+  Device, Rescan, the Audio buffer and the About block (the panel's note says so). Pour is a
+  button: 1 then 0, the plugin pours on the rising edge.
+- **WebGL2's format trap, and the answer.** The FFGL SDK's `FFGLFBO::Initialise` allocates the
+  field lattice (RG32F) and the splat's density (RG16F) as `glTexImage2D( …, GL_RGBA,
+  GL_FLOAT, NULL )`. Desktop GL takes any client format with no data; WebGL2 takes only ES
+  3.0's pairs, and for those two formats the pair is GL_RG, so it answers INVALID_OPERATION and
+  the framebuffer is incomplete. The shim gives an allocation with no data of RG32F or RG16F
+  the format GL_RG instead (nothing about what is allocated changes) and aborts on anything
+  else it doesn't expect. The grain state (RGBA32F) and the mode shapes (an R32F 2D array by
+  glTexImage3D/glTexSubImage3D from GL_RED) are ES pairs already. No format was changed: every
+  target renders under EXT_color_buffer_float (the page stops without it), the splat blends
+  into RG16F (no EXT_float_blend needed), and the plugin reads nothing back, so bubble's
+  R32F-read-as-RGBA trap doesn't arise.
+- **The audio, never a device.** The page never calls a device API (`check_shaders.py` fails if
+  a served file names getUserMedia, enumerateDevices, mediaDevices or an AudioContext other
+  than the offline one), the module cannot open one, and `ed_prepare` sets
+  `EIDOPHONE_NO_DEVICES=1` so `AudioInput::Refresh` never asks. The host row's choices: the
+  page's track (held sines at −12 dBFS made by edtest's `sine()`, copied character for
+  character with `defaultToneHz()` and held to `tools/edtest/main.cpp` by `check_shaders.py`,
+  with a 50 ms raised-cosine fade at each end and 1.5 s of silence after each: D2 73.42 Hz for
+  7 s, then the centre modes 96.57 Hz (the star) for 7 s, 188.22 for 9, 257.61 for 10 and
+  428.69, edtest `--tone 0`, for 12, looped every 52.5 s); edtest `--bins 1` (nothing fed;
+  the plugin's fallback, the one behind its default Device, on the made-up buffer, written
+  once: 516.8 Hz under Linear, 23.6 Hz under Log); and a file of the visitor's, decoded by
+  `decodeAudioData` in an `OfflineAudioContext` at 48 kHz (no output device), mono to both
+  channels, looped (edtest `--wav` plays once). Before the frame at page time t every sample to
+  (t + 1/60) × 48 000 has been fed, as edtest's Feeder feeds frame f to (f + 1)/fps. Nothing is
+  played aloud. Every change of audio or plugin, and Restart, is a new instance from time 0 (a
+  feed lasts until a selectDevice, which nothing here calls). The page's default audio is the
+  track, where the plugin's own default Device is "Resolume FFT (no pitch)".
+- **The clock: preset, not voted.** In Resolume the plugin votes for four frames on whether
+  SetTime is in seconds or milliseconds and runs on the wall clock until then. Here a new
+  instance's first frame builds its mode table in WebAssembly, and under the vote that
+  wall-clock time would become up to 32 substeps of grain walk the harness never takes; so
+  the glue presets seconds, as edtest does, and the page's frames are edtest's frames. The
+  page sends seconds from frame deltas (capped at 0.1 s by the kit); paused, a moved control
+  redraws with no substep and nothing fed; Step is 1/60 s, eight substeps.
+- **Checked by `tools/verify.sh`** (`demo/tools/check_shaders.py`, step "Browser demo's
+  copies"): the ten GLSL pieces character for character and the order Assemble(),
+  SplatVertex() and InitGL join them in for the seven stages and five programs; all 38
+  uniforms set by the setter their type takes (array uniforms by `fv` with
+  `shaders::kMaxModes`), nothing undeclared set; edtest's `sine()` and `defaultToneHz()`, its
+  four `--bins` lines, its clock preset, feed lead and tone level in the glue; no served file
+  naming a device API; the hashes of every input the .wasm was built from
+  (`demo/wasm/inputs.sha256`, 68 files) and the SDK pin. A one-character shader change and a
+  one-byte change to `source/Plate.cpp` each fail it. Any change under `source/` or
+  `external/earshot/` needs `demo/tools/build-wasm.sh` rerun and its outputs committed (mode
+  644).
+- **Compared with edtest, once (2026-11-18), by `demo/tools/crosscheck.py`** (in the repo;
+  nothing runs it by itself: it needs Chrome, cdpshot and a built edtest). Headless Chrome on
+  the real GPU (ANGLE on Metal), the page paused, the settings applied, the audio chosen (a new
+  instance and its frame at 0), then N presses of Step: N + 1 frames, the last at N/60 s, with
+  (N + 1) × 800 samples fed. edtest renders N + 1 frames with the same host values: `--pipe
+  --fps 60 --wav` on the page's own track samples, read out of its WebAssembly memory into a
+  float WAV (the Over fed the page's own input frame, read back at Mix 0), or the plain render
+  with `--bins 1` for the fallback (`--pipe` has no `--bins`; that PNG has no alpha). Apple
+  M4 Max, 640×360 (691,200 colour values a case):
+
+  | case | N | colour values off | max | 8×8 blocks, max |
+  | --- | --- | --- | --- | --- |
+  | source, defaults, the D2 note | 330 | 321 | 5 codes | 0.0 codes |
+  | source, defaults, the star note 1.5 s in | 600 | 523 | 16 codes | 0.3 codes |
+  | source, Circle, Drive At 0.4, Both | 300 | 1,949 | 2 codes | 0.1 codes |
+  | source, 30 cm brass, Gain 30 g, Fill | 240 | 861 | 14 codes | 0.3 codes |
+  | Over, defaults (scene) | 330 | 859 | 14 codes | 0.1 codes |
+  | Over, Fit, Mix 50%, Powder (bars) | 240 | 572 | 1 code | 0.1 codes |
+  | source, Resolume FFT (`--bins 1`) | 240 | 15 | 1 code | 0.0 codes |
+  | Over, Resolume FFT, Bin Law Log (grid) | 180 | 347 | 2 codes | 0.0 codes |
+
+  Alpha identical wherever compared; the drive (73.42 Hz, F₀ 3.9832 N on the defaults) and the
+  substep count identical. Two negative controls on the first case fail the mark (under 1% of
+  values off and no 8×8 block past 1 code), as they must: Gain one slider step (0.001) off puts
+  18,636 values off (2.7%), up to 71 codes, and the other Shape 158,304. Run twice, the same
+  numbers. So the wasm build lands on the Mac's grain for grain to within a few hundred
+  values: the chaotic walk has not amplified the libm and shader-compiler differences in 10 s
+  on this GPU. Another GPU is another matter.
+- **Also checked on the page** (CDP, the real GPU): the defaults read back as the plugin's on
+  both (the source in Fit, the Over in Fill with Mix 100%), and switching the plugin resets to
+  that constructor's defaults; the corner arcs and the ring round the stem are drawn within
+  2.4 s of loading, and the star when its note comes; Shape changes the picture paused, and Gain
+  one slider step changes it (the negative control above); the fallback reads 516.8 Hz; a 44.1 kHz
+  mono WAV of 188.22 Hz chosen through the file input decodes and gives earshot's pitch
+  188.22 Hz on the mode at 188.22 Hz; all twelve presets render with no GL error; Defaults
+  gives the constructor's values back and two Restarts give the same first frame; embed mode
+  shows the picture alone; no horizontal scroll at 375 px; no device call (getUserMedia,
+  enumerateDevices and AudioContext wrapped from outside, none called); no console errors.
+- **Cost, Chrome on an M4 Max at 960×540**: 60 frames a second (the display's rate) at the
+  default 65,536 grains and at 262,144, the most Amount allows, so the plugin's range is kept;
+  a frame's CPU side about 1.6 ms. A change of Shape or Material holds the page for that
+  frame: about half a second for the circle's first table, about a tenth for a change to a
+  table already built (the tables are cached per shape and ν for the visit; the 66 mode shapes
+  are uploaded again on every change).
+- **Every gap, as the page discloses it** (banner, the panel's note, the "does not reproduce"
+  list): it runs the plugin, not a port, and the units, tooltips and presets are the page's;
+  no audio device or microphone, earshot built without capture, Device, Rescan and the Audio
+  buffer off the panel, the live-device path (Missing, Failed, the rim cues, the remembered
+  name) absent; the page's audio is not the plugin's default "Resolume FFT (no pitch)", where
+  the note is a guess from the loudest of 64 bins, but a real pitch through `feed()`; the
+  fallback runs only on `--bins 1`'s made-up buffer; the track or a file is decoded, resampled
+  to 48 kHz and looped in the page, never played aloud; every audio or plugin change is a new
+  instance from time 0, and the clock is preset to seconds rather than voted; a frame is a
+  display refresh, below 15 a second the plugin drops substeps; the plugin's own limits (high
+  notes draw slowly, as 1/f²; the lowest mode, near 37.5 Hz, under earshot's 40 Hz floor; one
+  note at a time; the hop, the powder current and the damping are assumptions; no sand off
+  the edge, no angle of repose, no collisions); GL is emscripten's WebGL2 with five shimmed
+  entry points and the kit's GLSL port; WebAssembly has no fused multiply-add and musl's libm;
+  the clip is the kit's and premultiplied, so the kit's alpha clip is left out, and the
+  Over's partly transparent rim in Fit shows a little brighter on the page's canvas; the
+  About block is off the panel; nothing is measured, and the plugin has never been in
+  Resolume or opened a device.
+- **Traps hit**: the FFGLFBO format trap above (WebGL2's INVALID_OPERATION on RG32F/RG16F with
+  GL_RGBA); GL_PROGRAM_POINT_SIZE is an INVALID_ENUM in WebGL2 and GLState saves and restores
+  it every frame; `edtest --pipe` ignores `--bins` (the crosscheck uses the plain render for
+  the fallback, whose PNG writes alpha 1) and the plain render with no `--wav` and no `--bins`
+  plays `--tone 0`; the kit's canvas has no `preserveDrawingBuffer`, so a paused page reads
+  back zeros unless the attribute is forced from outside (`Page.addScriptToEvaluateOnNewDocument`
+  with a `getContext` override); the kit's inspector note says every declared parameter is on
+  the panel, so the page appends which four are not; the read-out column fits about ten
+  characters, so units went into the tooltips; the shared checkouts of the sibling demos lag
+  origin, so the references were read from `git archive origin/main`.

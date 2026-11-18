@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Eidophone — browser demo | Stoatworks Labs</title>
+    <meta name="description" content="Try the Eidophone FFGL plugins for Resolume in your browser: a Chladni plate with sand on it, sounded by the music, as a source and as an effect that prints your clip on the plate under the sand. Nothing is drawn: a free metal plate answers the music's pitch in its own modes, and the sand is thrown off everywhere but the nodal lines. The plugin's own C++ compiled unmodified to WebAssembly, drawing with its own GLSL in WebGL2, fed a track of held notes or a file of yours, never a microphone. A demo, not the plugin." />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./vendor/kit.css" />
+    <link rel="stylesheet" href="./eidophone.css" />
+    <link rel="canonical" href="https://eidophone-demo.stoatworks-labs.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Stoatworks Labs" />
+    <meta property="og:title" content="Eidophone — browser demo | Stoatworks Labs" />
+    <meta property="og:description" content="Try the Eidophone FFGL plugins for Resolume in your browser: a Chladni plate with sand on it, sounded by the music, as a source and as an effect that prints your clip on the plate under the sand. Nothing is drawn: a free metal plate answers the music's pitch in its own modes, and the sand is thrown off everywhere but the nodal lines. The plugin's own C++ compiled unmodified to WebAssembly, drawing with its own GLSL in WebGL2, fed a track of held notes or a file of yours, never a microphone. A demo, not the plugin." />
+    <meta property="og:url" content="https://eidophone-demo.stoatworks-labs.com/" />
+    <meta property="og:image" content="https://stoatworks-labs.com/thumbs/eidophone.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="720" />
+    <meta property="og:image:alt" content="Eidophone" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <main id="demo">
+      <noscript>
+        <h1>Eidophone</h1>
+        <p>
+          An FFGL source that's a metal plate seen from above with sand on it, and an effect that
+          prints your clip on the plate under the sand, both sounded by the music. Nothing is
+          drawn. A free plate, square or round, is pushed at a point by a force that follows the
+          music's pitch and loudness, and answers in its own modes, each a damped resonator. A
+          grain can leave the plate only where the plate's acceleration beats gravity, so the sand
+          is thrown off everywhere but the nodal lines and gathers there into Chladni's figures: a
+          new note half-redraws the old figure, a quiet passage freezes it exactly, and fine powder
+          heaps up the other way, at the antinodes.
+        </p>
+        <p>
+          This demo runs the plugin's own C++, compiled to WebAssembly, and its shaders in your
+          browser, so it needs JavaScript and WebGL2. It never uses a microphone.
+        </p>
+        <ul>
+          <li><a href="https://github.com/stoatworks-labs/eidophone">Source on GitHub</a></li>
+        </ul>
+      </noscript>
+    </main>
+
+    <script type="module" src="./plugin.js"></script>
+    <script
+      src="./vendor/support-footer.js"
+      defer
+      data-app="Eidophone"
+      data-repo="https://github.com/stoatworks-labs/eidophone"
+      data-note="A browser demo of the plugin's own C++ and shaders, compiled to WebAssembly and WebGL2. It never uses a microphone, and nothing you load here leaves your machine."
+    ></script>
+  </body>
+</html>

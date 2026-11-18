@@ -85,6 +85,10 @@ departs from it.
   `state threshold hop splat alpha redraw clock`).
 - `ED_DEBUG=1` prints the hop's per-step means, the nodal check's worst grain and the
   splat's sums.
+- Browser demo (`demo/`, AGENTS.md "Browser demo"): after ANY change under `source/` or
+  `external/earshot/`, rerun `demo/tools/build-wasm.sh` (emscripten) and commit its outputs;
+  after a shader change, `python3 demo/tools/check_shaders.py --write`. verify.sh fails until
+  you do. Against edtest: `python3 demo/tools/crosscheck.py --edtest build/edtest`.
 
 ## Notes
 - **Units.** Metres, seconds, m/s². Plate coordinates are [−1, 1] over the half-width L

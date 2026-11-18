@@ -198,6 +198,22 @@ peak.
 - No sand falling off the edge (the rim holds it), no heaps with an angle of repose, no
   grain–grain collisions, no thick-plate corrections.
 
+## Browser demo
+
+[eidophone-demo.stoatworks-labs.com](https://eidophone-demo.stoatworks-labs.com/) runs both
+plugins in your browser: their own C++ (the plugin class, the plate's modes and oscillators in
+double, the audio law and earshot under it) compiled unmodified to WebAssembly, drawing with
+their own GLSL in WebGL2. The page is the host, and it never opens or lists an audio device or
+asks for a microphone. It feeds the plugin through earshot's `feed()` as `edtest --wav` does: a
+track of held notes on the default plate's modes (D2, then 96.57 Hz for the four-pointed star,
+188.22, 257.61 and 428.69 Hz), made by `edtest`'s own `sine()`, or an audio file of yours
+decoded in the page and never uploaded; or nothing at all, with `edtest --bins 1`'s made-up FFT
+in the Audio buffer for the plugin's own fallback, the one behind its default Device. Device,
+Rescan and the live-device path are not in the browser. A frame of the page matched `edtest`'s
+on the same settings, audio and frames in all but 0.3% of its colour values or fewer, in eight
+cases across both plugins ([AGENTS.md](AGENTS.md#browser-demo)). It is a demo, not the plugin,
+and the page lists what it leaves out.
+
 ## Build
 
 macOS (universal: Apple Silicon and Intel), from a checkout with its submodule
