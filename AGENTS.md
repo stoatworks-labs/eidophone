@@ -464,6 +464,13 @@ and fountain's.
   the glue presets seconds, as edtest does, and the page's frames are edtest's frames. The
   page sends seconds from frame deltas (capped at 0.1 s by the kit); paused, a moved control
   redraws with no substep and nothing fed; Step is 1/60 s, eight substeps.
+- **Photosensitivity: no note.** The release survey (2026-11-18, xenon's flashcheck rule:
+  whole frame and 25 third-of-frame windows, 640×360 at 60 fps, 7.5 s a clip) ran SW Eidophone
+  at 14 settings on 33 tracks (462 runs, Gain 40 g, the most and biggest grains, Pour four times
+  a second among them) and SW Eido Over at 6 settings on all 33 of Resolume's demo clips: none
+  over the line (at most 2 transitions in a second in any window for the source; the Over never
+  took a clip over it). So the page has no warning and no gate, its defaults are the plugin's,
+  and its notes say so in one line.
 - **Checked by `tools/verify.sh`** (`demo/tools/check_shaders.py`, step "Browser demo's
   copies"): the ten GLSL pieces character for character and the order Assemble(),
   SplatVertex() and InitGL join them in for the seven stages and five programs; all 38
@@ -535,7 +542,7 @@ and fountain's.
   entry points and the kit's GLSL port; WebAssembly has no fused multiply-add and musl's libm;
   the clip is the kit's and premultiplied, so the kit's alpha clip is left out, and the
   Over's partly transparent rim in Fit shows a little brighter on the page's canvas; the
-  About block is off the panel; nothing is measured, and the plugin has never been in
+  About block is off the panel; the flash survey found nothing over the line; nothing is measured, and the plugin has never been in
   Resolume or opened a device.
 - **Traps hit**: the FFGLFBO format trap above (WebGL2's INVALID_OPERATION on RG32F/RG16F with
   GL_RGBA); GL_PROGRAM_POINT_SIZE is an INVALID_ENUM in WebGL2 and GLState saves and restores
