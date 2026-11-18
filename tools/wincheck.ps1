@@ -2,7 +2,7 @@
     What a host sees of a built Windows DLL, with no GL and no Resolume.
 
         tools/wincheck.ps1 -Dll build/Release/Eidophone.dll -Name "SW Eidophone" `
-                           -Id ED01 -Kind source -Params 23 -First "Shape"
+                           -Id ED01 -Kind source -Params 24 -First "Shape"
 
     It LOADS the DLL (so a missing runtime or dependency fails here, where
     dumpbin cannot see it), finds plugMain, and asks it what Resolume asks

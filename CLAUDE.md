@@ -119,9 +119,11 @@ departs from it.
   unmodified (`external/earshot/SNAPSHOT`). Never edit it; change earshot upstream and take a
   new archive. Its own CLAUDE.md and AGENTS.md are earshot's as of that commit, status lines
   and all.
-- **Provisional hand copies:** `source/StoatworksAbout*.h` (guide = "", no user guide yet)
-  and `ATTRIBUTIONS.md`. Once the project is registered in stoatworks-backend,
-  `sync-about.py` and `sync-attributions.py` generate them; edit them there then.
+- **Generated, don't edit here:** `source/StoatworksAbout.h` (stoatworks-backend's
+  `sync-about.py`, from the website's projects.json: the hook and the User guide button)
+  and `ATTRIBUTIONS.md` (`sync-attributions.py`, from the backend's `derived.json`, which
+  carries earshot's own credit row; miniaudio is found inside the snapshot). Registered
+  2026-11-18; the About block makes it 24 and 25 parameters.
 - **CI** (`.github/workflows/ci.yml`): macOS builds arm64 with the tools and runs `--list`,
   `--offline` and `glslc`; Windows builds both DLLs with MSVC and loads each as a host does
   (`tools/wincheck.ps1`, whose `-Params` changes whenever a control or the About block does).

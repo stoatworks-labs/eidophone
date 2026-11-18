@@ -103,8 +103,10 @@ tones, and `earshot::testing::CaptureBackend` so no step of the harness opens a 
   "Resolume FFT (no pitch)". The plugin takes the strongest of the 64 bins (never bin 0) at
   its centre under Bin Law (44.1 kHz assumed) and its value as the loudness. Under Linear
   the bins are 345 Hz wide.
-- **Provisional hand copies:** `source/StoatworksAbout*.h` (adapted from haze's, `guide`
-  empty, no user guide exists) and `ATTRIBUTIONS.md`.
+- **Generated since registration (2026-11-18):** `source/StoatworksAbout.h` by
+  stoatworks-backend's `sync-about.py` (the hook and a User guide button, so 24 and 25
+  parameters) and `ATTRIBUTIONS.md` by `sync-attributions.py`, whose earshot row is
+  earshot's own `code` row from its docs/INTEGRATING.md, copied unchanged.
 - **Workflows only once public.** `ci.yml` and `release.yml` were sed-adapted from haze's
   first versions and had never run; before the first push they were brought up to
   mirrorball's (haze's current shape: macOS 15, vcpkg applocal off, both DLLs loaded as a

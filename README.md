@@ -147,7 +147,7 @@ What it establishes:
 | `--alpha` | the Over at Mix 0 returns the clip with **0** of 3,686,400 floats different; its alpha is the grains laid over the clip's, to 2.3e-6; the clip untouched where no grain lies; the source's alpha is 1 |
 | `--splat` | the density the picture is drawn from against a CPU replica of GL's point rule: every grain once, at its place, to 0.12–0.27% of the mass (Apple's software renderer, 10 subpixel bits and float blending: 0.0005%) |
 | `--clock`, `--resize`, `--state`, `--redraw` | at a 499,000,000 ms host clock the frames stay 1/60 s apart to 6e-11 s; a raster change mid-run is **0 bytes** different from a fresh instance; the host's GL state comes back; a repeated host time runs no substep |
-| `--names`, `--cues` | 23 and 24 parameters, within FFGL's 16 characters, unique, the About block last; a cue sheet ramps and steps them |
+| `--names`, `--cues` | 24 and 25 parameters (23 and 24 before the About block's User guide button), within FFGL's 16 characters, unique, the About block last; a cue sheet ramps and steps them |
 | `--pipe` | both plugins: 2.5 frames in, exactly 2 out; a closed stdout (`\| head -c 1`) exits 1, not 141 |
 | `--negative` | **21** deliberately wrong models, **21** caught |
 | mutation | **26** one-character mutants of the shipped GLSL and C++, **26** caught |
