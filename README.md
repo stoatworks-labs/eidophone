@@ -178,7 +178,8 @@ peak.
 
 - **Resolume.** Never loaded, on either platform, so nothing here is known about how Arena
   sends its FFT or clock to it, or how it looks or performs in a composition.
-- **Windows.** Never built. The CI workflow in `.github/` was written and has never run.
+- **Windows.** Not yet run in a host. `.github/workflows/ci.yml` builds both DLLs with MSVC
+  and loads each as a host does (`tools/wincheck.ps1`).
 - **A real capture device.** The device menu, the opens and the rim cues are checked against a
   scripted backend; no microphone or loopback has fed it. Music came from WAVs through
   earshot's `feed()`.
@@ -200,7 +201,7 @@ peak.
 ## Build
 
 macOS (universal: Apple Silicon and Intel), from a checkout with its submodule
-(`git submodule update --init --recursive`; the repository is local, with no remote yet):
+(`git submodule update --init --recursive`):
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -218,8 +219,8 @@ The last one copies `Eidophone.bundle` and `Eido Over.bundle` into
 `~/Documents/Resolume Arena/Extra Effects`. Restart Arena and they're under Sources as
 **SW Eidophone** and under Effects as **SW Eido Over**.
 
-Windows needs Visual Studio 2022 and vcpkg (for GLEW); see `.github/workflows/ci.yml`.
-It has never been built there.
+Windows needs Visual Studio 2022 and vcpkg (for GLEW, from `vcpkg.json`); see
+`.github/workflows/ci.yml`.
 
 ## Building and testing
 

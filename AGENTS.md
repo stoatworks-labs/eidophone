@@ -2,7 +2,8 @@
 
 Why the code is the way it is. `CLAUDE.md` is the command reference; the design is
 `~/Projects/resolume/specs/SPEC-eidophone.md`, whose "As built" section lists where this repo
-departs from it. Built 2026-11-16 from the spec, in one session, local only.
+departs from it. Built 2026-11-16 from the spec, in one session; public at
+`github.com/stoatworks-labs/eidophone` from 2026-11-18.
 
 ## The idea
 
@@ -32,11 +33,11 @@ negative, a loud note far from every mode smears it all, and high notes draw slo
 
 ## The earshot snapshot
 
-`external/earshot/` is earshot (`~/dev/earshot`, local, never pushed) at commit **`8124191`**
+`external/earshot/` is earshot (`github.com/stoatworks-labs/earshot`) at commit **`8124191`**
 ("estest: a negative control for every check, enforced"), taken 2026-11-16 with `git archive
 8124191`, **unmodified, no patches**. `external/earshot/SNAPSHOT` records the same. verify.sh
-checks that SNAPSHOT and this file agree on the commit, and, when `~/dev/earshot` is present,
-that the snapshot's files are byte-for-byte that commit's. To update: take a new archive,
+checks that SNAPSHOT and this file agree on the commit, and, when an earshot checkout is
+present (`EARSHOT`, default `~/Projects/resolume/earshot`), that the snapshot's files are byte-for-byte that commit's. To update: take a new archive,
 change both records, rerun verify. Never edit files under `external/earshot/`; change earshot
 upstream.
 
@@ -104,8 +105,13 @@ tones, and `earshot::testing::CaptureBackend` so no step of the harness opens a 
   the bins are 345 Hz wide.
 - **Provisional hand copies:** `source/StoatworksAbout*.h` (adapted from haze's, `guide`
   empty, no user guide exists) and `ATTRIBUTIONS.md`.
-- **The workflows are files only.** `ci.yml` and `release.yml` were sed-adapted from haze and
-  have never run; there's no remote. Enable them only if the repo is public.
+- **Workflows only once public.** `ci.yml` and `release.yml` were sed-adapted from haze's
+  first versions and had never run; before the first push they were brought up to
+  mirrorball's (haze's current shape: macOS 15, vcpkg applocal off, both DLLs loaded as a
+  host loads them by `tools/wincheck.ps1`, ATTRIBUTIONS.md in each zip, the installer by
+  release-lib's `--ffgl`). The template had no `vcpkg.json`, so the Windows configure
+  could never have found GLEW: it is mirrorball's now. Actions only because the repo is
+  public.
 
 ## The traps actually hit
 
@@ -385,5 +391,5 @@ grains. One GPU only (an M4 Max); a small GPU or the software renderer is anothe
   values; both are excluded from the checks, unexplained.
 - **Never in Resolume.** Nothing is known about Arena's FFT or clock reaching it, or how it
   reads at a show.
-- **Never built on Windows.** MSVC's `far`/`near`, the GLEW path and miniaudio's WASAPI
-  backend are untested here.
+- **Windows by CI only.** MSVC builds it on GitHub's runner; miniaudio's WASAPI backend has
+  never opened a device.

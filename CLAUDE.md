@@ -5,7 +5,8 @@ FFGL plugins from one core: a free Kirchhoff plate (square by Rayleigh–Ritz, c
 Bessel functions) driven at a point, each mode a damped oscillator integrated exactly; sand
 thrown only where the plate's acceleration beats g, powder carried to the antinodes. Pitch
 and level from earshot (snapshot in `external/earshot`). C++/GLSL, CMake MODULE → universal
-`.bundle` (macOS) + Windows `.dll` (never built). MIT.
+`.bundle` (macOS) + Windows `.dll` (built on GitHub's Windows runner). MIT. Public:
+`github.com/stoatworks-labs/eidophone`.
 
 | | id | display name | bundle | type |
 | --- | --- | --- | --- | --- |
@@ -45,9 +46,10 @@ departs from it.
 
 ## Verify
 - Everything: `OXBOW=… tools/verify.sh [BUILD_DIR]` (reserved-word, far/near/M_PI and WebGL2
-  greps, `glslc`, the submodule pin, the earshot snapshot against SNAPSHOT, AGENTS.md and
-  `~/dev/earshot`, a fresh universal build in `build-verify` with no warnings, both bundles
-  through lipo, nm, plist, ad-hoc signature, `oxbow probe` and `selftest`; every check below;
+  greps, `glslc`, the submodule pin, the earshot snapshot against SNAPSHOT, AGENTS.md and an
+  earshot checkout (`EARSHOT`, default `~/Projects/resolume/earshot`), a fresh universal
+  build in `build-verify` with no warnings, both bundles through lipo, nm, plist, ad-hoc
+  signature, `oxbow probe` and `selftest`; every check below;
   seven on Apple's software renderer; `--offline`; `--pipe` for both; the negative controls;
   26 mutants; the sweep; the bench): about two minutes on this Mac.
 - **Set `OXBOW`** to a built `oxbow` binary. verify.sh fails without it, never "skipped".
@@ -113,20 +115,24 @@ departs from it.
 - `eidophone_core` is an OBJECT library: each plugin registers itself from a file-scope
   constructor nothing references.
 - The macOS build must be universal. Check with `lipo`, never the build log.
-- **The earshot snapshot** is `8124191`, unmodified (`external/earshot/SNAPSHOT`). Never edit
-  it; change earshot upstream and take a new archive.
+- **The earshot snapshot** is earshot (`github.com/stoatworks-labs/earshot`) at `8124191`,
+  unmodified (`external/earshot/SNAPSHOT`). Never edit it; change earshot upstream and take a
+  new archive. Its own CLAUDE.md and AGENTS.md are earshot's as of that commit, status lines
+  and all.
 - **Provisional hand copies:** `source/StoatworksAbout*.h` (guide = "", no user guide yet)
   and `ATTRIBUTIONS.md`. Once the project is registered in stoatworks-backend,
   `sync-about.py` and `sync-attributions.py` generate them; edit them there then.
-- **The workflows are files only.** `.github/workflows/ci.yml` and `release.yml` were
-  adapted from haze and have never run. There's no remote. If the repo goes to GitHub as a
-  private repo, they must not be enabled (the fleet's Actions quota); build and release
-  locally.
-- Local only: `~/dev/eidophone`, no remote, nothing released, not on the website.
+- **CI** (`.github/workflows/ci.yml`): macOS builds arm64 with the tools and runs `--list`,
+  `--offline` and `glslc`; Windows builds both DLLs with MSVC and loads each as a host does
+  (`tools/wincheck.ps1`, whose `-Params` changes whenever a control or the About block does).
+  `release.yml` builds the universal bundles and the DLLs with their zips, `.dmg` and
+  installer; dispatched by hand it builds without publishing, and a `v*` tag publishes.
+  Actions only because the repo is public: a private copy must never enable them.
+- Checkout: `~/Projects/resolume/eidophone`, public at `github.com/stoatworks-labs/eidophone`.
 
 ## Not done yet
-- Never loaded in Resolume (either platform); never built on Windows; no host has sent it
-  its FFT, and no real capture device has fed it.
+- Never loaded in Resolume (either platform); no host has sent it its FFT, and no real
+  capture device has fed it. Windows is built by CI only.
 - No user guide, no OpenFX port, no browser demo, no presets.
 
 ## Diagnostics
