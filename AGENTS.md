@@ -219,7 +219,8 @@ Assumed, not measured: Q (one damping ratio for every mode); the ideal force sou
 free plate (no driver mass or suspension); rigid-body modes in steady state; the hop's form,
 β = 1 and H; the powder current's form and P; the rim reflecting (a real plate's sand falls
 off); the field held over a frame's substeps; the host bins' law, value and 44.1 kHz rate;
-the colours; how Resolume sends its FFT to this plugin (never loaded).
+the colours; how Resolume sends its FFT to this plugin (in Arena on the Mac it never moved
+the sand: README, In Resolume).
 
 ## Would this hold on another rasteriser, at another raster?
 
@@ -391,10 +392,14 @@ grains. One GPU only (an M4 Max); a small GPU or the software renderer is anothe
 - **Iguchi's 65.3680** (SS-A, ν 0.3) has no counterpart anywhere in the converged spectrum,
   and Leissa's Table 4.67 "more precise upper bounds" column (ref 4.76) lies below converged
   values; both are excluded from the checks, unexplained.
-- **Never in Resolume.** Nothing is known about Arena's FFT or clock reaching it, or how it
-  reads at a show.
-- **Windows by CI only.** MSVC builds it on GitHub's runner; miniaudio's WASAPI backend has
-  never opened a device.
+- **Never moved to music inside Resolume.** In Arena 7.29.0 on the Mac (2026-11-18) both
+  plugins registered, drew and answered their drawing controls, but with Beat 001 playing on
+  the layer below, 23 snapshots were identical on the defaults and at Gain 40 g, Bin Law Log:
+  Resolume's FFT gave the fallback nothing that threw a grain (woofer saw the same there).
+  Whether the FFT was empty on that Mac's audio set-up was not found out. Never in a show.
+- **Windows on win-lab only.** MSVC builds it on GitHub's runner, and win-lab's Arena 7.27.1
+  (llvmpipe, no sound device) passed the fleet's gate on the release workflow's DLLs (15
+  passed, 0 failed, 4 skipped); miniaudio's WASAPI backend has never opened a device.
 
 ## Browser demo
 

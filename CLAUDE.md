@@ -137,9 +137,12 @@ departs from it.
 - Checkout: `~/Projects/resolume/eidophone`, public at `github.com/stoatworks-labs/eidophone`.
 
 ## Not done yet
-- Never loaded in Resolume (either platform); no host has sent it its FFT, and no real
-  capture device has fed it. Windows is built by CI only.
-- No user guide, no OpenFX port, no browser demo, no presets.
+- Never moved to music inside Resolume: in Arena on the Mac (7.29.0, 2026-11-18) it loaded,
+  drew and answered its drawing controls, but Resolume's FFT threw no grain. On Windows it
+  has run only in win-lab's Arena (no GPU, no sound device), through the fleet's gate. No
+  real capture device has fed it.
+- No OpenFX port, no presets. The user guide is `docs/USER-GUIDE.md`; the browser demo is
+  `demo/`.
 
 ## Diagnostics
 

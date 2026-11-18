@@ -1,9 +1,9 @@
 # eidophone
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
-> (Anthropic), directed and reviewed by a human author. It has **never been loaded into
-> Resolume**, on macOS or Windows, and has never been built on Windows. Everything below is
-> measured by an offline harness, `edtest`, that drives the real plugin classes in a headless
+> (Anthropic), directed and reviewed by a human author. It has been run in **Resolume only
+> briefly**, in Arena on a Mac and on a Windows VM with no GPU, and **the music never moved its
+> sand there** (see [In Resolume](#in-resolume)). Everything else below is measured by an offline harness, `edtest`, that drives the real plugin classes in a headless
 > GL context on a synthetic clock, on this Mac's GPU at two rasters and partly on Apple's
 > software renderer, and reads the plate's modes, the grain state and the picture straight
 > back. The plate is checked against published physics, not screenshots. The free square's
@@ -117,16 +117,17 @@ not an error) a pulsing red one.
 
 ## Status
 
-**v0.1.0, 16 November 2026, unreleased, and early days.** It has **never been loaded into
-Resolume** on either platform and never been built on Windows. `oxbow probe` reads the
-bundles as a host does (`SW Eidophone` / `ED01` / source, `SW Eido Over` / `ED02` / effect)
-and `oxbow selftest` renders through each. There's no user guide yet, no OpenFX port and no
-browser demo.
+**v0.1.0, 18 November 2026, the first release, and early days. Run in Resolume only briefly, in
+Arena on a Mac and on a Windows VM; Resolume's FFT never moved the sand there, and no live audio
+device has ever been opened.** `oxbow probe` reads the bundles as a host does (`SW Eidophone` /
+`ED01` / source, `SW Eido Over` / `ED02` / effect) and `oxbow selftest` renders through each.
+There's a [user guide](docs/USER-GUIDE.md) and a [browser demo](#browser-demo); no OpenFX port
+and no presets.
 
 ### Measured offline, on macOS
 
 `tools/verify.sh` passes on this machine (Apple Silicon, macOS 26) against a fresh universal
-Release build (16 November 2026, two minutes). It runs every GL check at **two rasters**,
+Release build (18 November 2026, two and a half minutes). It runs every GL check at **two rasters**,
 1280×720 and 320×180, and seven of them again on **Apple's software renderer** at 320×180.
 What it establishes:
 
@@ -156,9 +157,10 @@ What it establishes:
 | the bundles | both universal (`x86_64 arm64`), export `plugMain`, ad-hoc sign; `oxbow` reads their name, id and type and renders through both |
 
 Render cost, GPU time by `GL_TIME_ELAPSED`, median after warm-up, every grain thrown, from
-verify.sh's run on 16 November 2026 on an M4 Max shared with other work. At the defaults (65,536 grains) the source takes **0.27 ms** at 720p, **0.31 ms** at
-1080p and **0.62 ms** at 4K; the Over **0.28**, **0.42** and **0.93 ms**. At 1080p the most
-grains Amount allows (262,144) take 0.64 ms, 16,384 take 0.24, and Both 0.35: inside a
+verify.sh's run on 18 November 2026 on an M4 Max shared with other work. At the defaults
+(65,536 grains) the source takes **0.26 ms** at 720p, **0.31 ms** at 1080p and **0.61 ms** at
+4K; the Over **0.28**, **0.41** and **0.87 ms**. At 1080p the most grains Amount allows
+(262,144) take 0.64 ms, 16,384 take 0.23, and Both 0.35: inside a
 60 fps frame with room to spare at any setting. The grain update (8 substeps a frame over
 every grain) is most of it below 4K and is the same at any raster. macOS
 figures only, on one GPU.
@@ -174,12 +176,47 @@ audio law (a fixed force for a fixed level, on clearly pitched frames only) left
 still through most of these clips; the law now follows the music's level over its own recent
 peak.
 
+### In Resolume
+
+- **Arena 7.29.0 on an Apple Silicon Mac** (M4 Max), with both universal bundles from this
+  source (signed ad hoc), mounted over Arena's REST API in a new composition: a blue still on
+  layer 1, a test card on layer 2 (an opaque third, a half-transparent third and a clear
+  third). Both register: SW Eido Over as an effect with **26** parameters shown (Opacity and
+  the 25 declared), SW Eidophone as a source with its **24**, each with its declared defaults
+  and the About line `Eidophone v0.1.0 - MIT - Stoatworks Labs, stoatworks-labs.com`. The
+  Device menu starts with "Resolume FFT (no pitch)", then "System default" and the Mac's own
+  devices: the plugin lists them for its menu when it loads, and opened none (no capture line
+  in its log) and no microphone prompt appeared.
+- **In silence nothing moves, exactly.** Two snapshots 2 s apart were identical, for each
+  plugin. Mix 0 on the Over was identical to the bare card. The source covered the blue layer
+  below it entirely (its alpha is 1). In Fill at the default Amount the Over's sand is sparse:
+  99.9% of the card's pixels came through within 2 levels.
+- **The controls that draw, draw.** View, Grain Size, Amount and Mix (Over), and View, Grain
+  Size, Amount, Material and Drive At (source) each changed the picture; Pour, Shape and Grain
+  strew the grains afresh, and did. The ones that act through the drive (Size, Thickness,
+  Damping, Gain, Clarity, Bin Law, Hop, Air) changed nothing in silence, as they shouldn't.
+- **Resolume's FFT never moved the sand.** With Arena's demo clip Beat 001 playing on the layer
+  below (its own audio), 23 snapshots about a tenth of a second apart were identical, for each
+  plugin, on the defaults and again at Gain 40 g with Bin Law on Log. Whether Arena's FFT was
+  empty on that Mac's audio set-up or the fallback's guess too small to throw a grain was not
+  found out (woofer, the fleet's other audio plugin, saw the same on the same Mac); nothing
+  in the plugin was changed for it. So **it has never moved to music inside Resolume.**
+- **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with the x64
+  DLLs the release workflow built from this source: the fleet's Arena gate passed **15**
+  checks, failed none and skipped 4. Both load and register (`ED01`, a source; `ED02`, an
+  effect), show all 24 and 26 controls with the declared name, order, type, range and
+  default, render, and 7 controls of each move the picture. The 10 and 12 that act only
+  through the drive are skipped there (no sound device), and Rescan and Pour (events) are
+  recorded inert. Arena's log was clean and it survived the run. The MSVC build has no
+  warnings, and `tools/wincheck.ps1` loads each DLL as a host does and reads back its 24 and
+  25 parameters.
+- It has never been in a show, and nothing was timed inside Resolume.
+
 ### Not established
 
-- **Resolume.** Never loaded, on either platform, so nothing here is known about how Arena
-  sends its FFT or clock to it, or how it looks or performs in a composition.
-- **Windows.** Not yet run in a host. `.github/workflows/ci.yml` builds both DLLs with MSVC
-  and loads each as a host does (`tools/wincheck.ps1`).
+- **The sand has never moved to music inside Resolume.** Resolume's FFT did not move it in
+  Arena on the Mac (above), Avenue has never loaded it, and it has never run on a Windows
+  machine with a GPU or a sound device.
 - **A real capture device.** The device menu, the opens and the rim cues are checked against a
   scripted backend; no microphone or loopback has fed it. Music came from WAVs through
   earshot's `feed()`.
@@ -195,6 +232,18 @@ peak.
 - **The default plate's lowest mode** (near 37.5 Hz) is under earshot's 40 Hz pitch floor,
   so only the FFT fallback or a note's overtones can ring it.
 - **One note at a time.** Chords are not separated; the pitch tracker gives one.
+- **The audio law is not the spec's, and it is relative.** The note is earshot's pitch, held
+  between notes; the loudness is the RMS of earshot's band envelopes, voiced or not; Gain is
+  the plate's peak acceleration at the loudest passage of the last few seconds (a running
+  peak with an 8 s release). So a quiet track shakes the plate as hard as a loud one, and a VJ
+  who wants loud to mean loud has no absolute-level switch.
+- **High notes draw slowly**, as 1/f² at the same Gain: a note two octaves up takes sixteen
+  times as long. Hop scales every hop; whether the default should rise with pitch is open.
+- **The Over's sand reads sparse** in Fill at the default Amount (65,536 grains over the whole
+  frame); more grains cost little (Render cost, above).
+- **Two published values are left out, unexplained.** Iguchi's 65.3680 (SS-A, ν 0.3) has no
+  counterpart anywhere in the converged spectrum, and Leissa's Table 4.67 "more precise upper
+  bounds" column (ref 4.76) lies below converged values. Both are excluded from `--modes`.
 - No sand falling off the edge (the rim holds it), no heaps with an angle of repose, no
   grain–grain collisions, no thick-plate corrections.
 
