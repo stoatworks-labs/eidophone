@@ -38,6 +38,44 @@ sand lying on it in rings and curves where the plate is still](docs/over.png)
 the clip and the `Synth 003` WAV as the music, its 225th frame through `--pipe` (`--over
 --pipe --fps 30 --size 1280x720 --wav "Synth 003.wav"`).</sub>
 
+<!-- downloads:start -->
+
+## Download
+
+**[v0.1.0](https://github.com/stoatworks-labs/eidophone/releases/tag/v0.1.0)** — prebuilt for macOS and Windows. Pick your platform:
+
+<details>
+<summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`eidophone-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/eidophone/releases/download/v0.1.0/eidophone-0.1.0-macos-universal.dmg) | 1.3 MB |
+| Universal (Apple Silicon + Intel) · .zip archive | [`eidophone-macos-universal.zip`](https://github.com/stoatworks-labs/eidophone/releases/latest/download/eidophone-macos-universal.zip) | 1.2 MB |
+
+</details>
+
+<details>
+<summary><b>Windows</b> — x64</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| x64 · .exe installer | [`eidophone-0.1.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/eidophone/releases/download/v0.1.0/eidophone-0.1.0-windows-x86_64-setup.exe) | 391 KB |
+| x64 · .zip archive | [`eidophone-windows-x86_64.zip`](https://github.com/stoatworks-labs/eidophone/releases/latest/download/eidophone-windows-x86_64.zip) | 540 KB |
+
+</details>
+
+All builds, checksums and release notes: [github.com/stoatworks-labs/eidophone/releases](https://github.com/stoatworks-labs/eidophone/releases).
+
+macOS builds are signed and notarised and open normally. The Windows builds are unsigned, so SmartScreen warns once.
+
+<!-- downloads:end -->
+
+## Video
+
+A video of both plugins, rendered by `edtest` with Resolume's demo music as the sound that
+drove the sand, is scheduled on YouTube for 04:45 London time on 20 November 2026. Its link
+goes here once it is public.
+
 ## The one idea
 
 **A plate rings in the shapes it can ring in; sand sits still only where the plate is still
@@ -201,9 +239,10 @@ peak.
   empty on that Mac's audio set-up or the fallback's guess too small to throw a grain was not
   found out (woofer, the fleet's other audio plugin, saw the same on the same Mac); nothing
   in the plugin was changed for it. So **it has never moved to music inside Resolume.**
-- **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with the x64
-  DLLs the release workflow built from this source: the fleet's Arena gate passed **15**
-  checks, failed none and skipped 4. Both load and register (`ED01`, a source; `ED02`, an
+- **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with this
+  release's own x64 DLLs, from its `.zip`, and before the tag with the release workflow's
+  pre-tag build: the fleet's Arena gate passed **15** checks, failed none and skipped 4, the
+  same verdicts both times. Both load and register (`ED01`, a source; `ED02`, an
   effect), show all 24 and 26 controls with the declared name, order, type, range and
   default, render, and 7 controls of each move the picture. The 10 and 12 that act only
   through the drive are skipped there (no sound device), and Rescan and Pour (events) are
