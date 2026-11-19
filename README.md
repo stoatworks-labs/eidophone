@@ -2,8 +2,8 @@
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
 > (Anthropic), directed and reviewed by a human author. It has been run in **Resolume only
-> briefly**, in Arena on a Mac and on a Windows VM with no GPU, and **the music never moved its
-> sand there** (see [In Resolume](#in-resolume)). Everything else below is measured by an offline harness, `edtest`, that drives the real plugin classes in a headless
+> briefly**, in Arena on a Mac and on a Windows VM with no GPU; on the Mac, **Resolume's own FFT
+> throws the sand with a demo drum loop playing** (see [In Resolume](#in-resolume)). Everything else below is measured by an offline harness, `edtest`, that drives the real plugin classes in a headless
 > GL context on a synthetic clock, on this Mac's GPU at two rasters and partly on Apple's
 > software renderer, and reads the plate's modes, the grain state and the picture straight
 > back. The plate is checked against published physics, not screenshots. The free square's
@@ -156,8 +156,8 @@ not an error) a pulsing red one.
 ## Status
 
 **v0.1.0, 18 November 2026, the first release, and early days. Run in Resolume only briefly, in
-Arena on a Mac and on a Windows VM; Resolume's FFT never moved the sand there, and no live audio
-device has ever been opened.** `oxbow probe` reads the bundles as a host does (`SW Eidophone` /
+Arena on a Mac and on a Windows VM; on the Mac Resolume's FFT throws the sand with music playing,
+and no live audio device has ever been opened.** `oxbow probe` reads the bundles as a host does (`SW Eidophone` /
 `ED01` / source, `SW Eido Over` / `ED02` / effect) and `oxbow selftest` renders through each.
 There's a [user guide](docs/USER-GUIDE.md) and a [browser demo](#browser-demo); no OpenFX port
 and no presets.
@@ -233,12 +233,18 @@ peak.
   Size, Amount, Material and Drive At (source) each changed the picture; Pour, Shape and Grain
   strew the grains afresh, and did. The ones that act through the drive (Size, Thickness,
   Damping, Gain, Clarity, Bin Law, Hop, Air) changed nothing in silence, as they shouldn't.
-- **Resolume's FFT never moved the sand.** With Arena's demo clip Beat 001 playing on the layer
-  below (its own audio), 23 snapshots about a tenth of a second apart were identical, for each
-  plugin, on the defaults and again at Gain 40 g with Bin Law on Log. Whether Arena's FFT was
-  empty on that Mac's audio set-up or the fallback's guess too small to throw a grain was not
-  found out (woofer, the fleet's other audio plugin, saw the same on the same Mac); nothing
-  in the plugin was changed for it. So **it has never moved to music inside Resolume.**
+- **Resolume's FFT throws the sand.** That first check (18 November) played `Beat 001.mov` on
+  the layer below, and nothing moved, because Arena's demo `.mov` clips are picture only: their
+  sound is in the matching `.wav` files. Re-tested on 19 November 2026 with the v0.1.0 release's
+  own bundles, Device on "Resolume FFT (no pitch)", the Audio buffer on Composition and
+  `Beat 001.wav` playing on the layer below, in snapshots about a fifth of a second apart: the
+  grains hopped on the loop's hits, in 16 of 19 snapshot pairs on the Over and 9 of 19 on the
+  source at the default Gain (12 g), and in 19 of 19 and 15 of 19 at 40 g, the most Gain gives,
+  where the source's sand began to gather into a figure; Arena's quieter `Bass 001.wav` moved
+  them too. With nothing playing, and once the loop was cleared, no pair changed, and the sand
+  stayed where it had landed. **Arena's Audio setting decides what they hear:** on External
+  (Arena's own audio input) nothing moved, 0 of 24 pairs for each plugin, and the Over on Local
+  (over a picture-only card, so hearing nothing) lay still too.
 - **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with this
   release's own x64 DLLs, from its `.zip`, and before the tag with the release workflow's
   pre-tag build: the fleet's Arena gate passed **15** checks, failed none and skipped 4, the
@@ -253,9 +259,9 @@ peak.
 
 ### Not established
 
-- **The sand has never moved to music inside Resolume.** Resolume's FFT did not move it in
-  Arena on the Mac (above), Avenue has never loaded it, and it has never run on a Windows
-  machine with a GPU or a sound device.
+- **Music inside Resolume beyond Arena's demo stems.** Resolume's FFT throws the sand in Arena
+  on the Mac (above), but no full mix has been played to it there, Avenue has never loaded it,
+  and it has never run on a Windows machine with a GPU or a sound device.
 - **A real capture device.** The device menu, the opens and the rim cues are checked against a
   scripted backend; no microphone or loopback has fed it. Music came from WAVs through
   earshot's `feed()`.

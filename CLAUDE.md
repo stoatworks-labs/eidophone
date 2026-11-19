@@ -137,8 +137,9 @@ departs from it.
 - Checkout: `~/Projects/resolume/eidophone`, public at `github.com/stoatworks-labs/eidophone`.
 
 ## Not done yet
-- Never moved to music inside Resolume: in Arena on the Mac (7.29.0, 2026-11-18) it loaded,
-  drew and answered its drawing controls, but Resolume's FFT threw no grain. On Windows it
+- Inside Resolume only briefly: in Arena on the Mac (7.29.0) it loaded, drew and answered its
+  drawing controls (2026-11-18), and Resolume's FFT threw the sand with `Beat 001.wav` playing
+  on the layer below (2026-11-19; the first day's `Beat 001.mov` has no sound track). On Windows it
   has run only in win-lab's Arena (no GPU, no sound device), through the fleet's gate. No
   real capture device has fed it.
 - No OpenFX port, no presets. The user guide is `docs/USER-GUIDE.md`; the browser demo is

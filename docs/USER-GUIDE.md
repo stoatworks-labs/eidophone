@@ -33,9 +33,9 @@ Resolume: Resolume's bundled `Beat 001` music, 7.5 s in.*
 > In Resolume it has run only briefly: in Arena 7.27.1 on Windows on software rendering, where
 > the fleet's Arena gate passed 15 of 15 (4 skipped: that machine has no sound device, so the
 > controls that need sound weren't tried), and in Arena 7.29.0 on a Mac, where both plugins
-> showed every control, drew, and held perfectly still in silence, but Resolume's own sound
-> analysis moved no grain with music playing, so they have **never moved to music inside
-> Resolume** (see [Known limits](#known-limits)). It has **never been in a show** and **never
+> showed every control, drew, held perfectly still in silence, and threw their sand to a demo
+> drum loop on Resolume's own sound analysis (see
+> [Where the sound comes from](#where-the-sound-comes-from)). It has **never been in a show** and **never
 > been driven by a real audio input**: every sound it has heard was fed to it from a file.
 > How a grain hops, how powder is carried and how much the plate is damped are **assumptions**,
 > not measurements. Try it on a spare layer before you put it in a show.
@@ -72,8 +72,9 @@ it trips SmartScreen once: **More info** → **Run anyway**. Or skip the install
 1. Put **SW Eidophone** in a clip slot and play it. You'll see a grey plate on black with its
    sand strewn evenly: nothing has sounded it yet.
 2. Give it sound. Its **Device** starts on "Resolume FFT (no pitch)", Resolume's own sound
-   analysis, which has no pitch (see [Where the sound comes from](#where-the-sound-comes-from));
-   in Arena 7.29.0 on one Mac it moved no grain even with music playing. For the real thing,
+   analysis, which has no pitch (see [Where the sound comes from](#where-the-sound-comes-from)):
+   play some music in the composition and the sand hops (Resolume's demo `.mov` clips have no
+   sound: play the matching `.wav`). For the real thing,
    pick a capture device in **Device**: a loopback of the music, an audio interface or a
    microphone. On macOS, the first time, macOS asks whether *Resolume* may use the microphone;
    say yes, or the plate hears silence and its rim pulses red.
@@ -145,8 +146,15 @@ opened, but there is no pitch either, so the plugin guesses the note from the lo
 (other than the lowest) and drives the plate at that band's centre. Under **Bin Law** Linear the
 bands are 345 Hz wide and every bass note lands in the first two, so the figures you get on
 Resolume's FFT are few and high. Which of Resolume's audio the bands carry is Resolume's
-**Audio** setting on the effect (Composition, Local or External, as on any audio-reactive
-effect).
+**Audio** setting, which Resolume adds to both plugins as to any audio-reactive effect.
+**Composition** (the default) hears every clip playing in the composition. **Local** hears only
+the clip the plugin is on: the Over on a clip with its own sound track hears that sound, and over
+a picture-only clip nothing; the source hears nothing. **External** hears Resolume's own audio
+input (Resolume's Preferences, under Audio), which in the Mac test heard nothing. A clip only has
+sound if its file has a sound track: Resolume's demo `.mov` clips are picture only, and their
+sound is in the matching `.wav` files. In Arena 7.29.0 on a Mac, Arena's demo drum loop
+`Beat 001.wav` on Composition made the grains hop on its hits at the default Gain, and at 40 g
+the source's sand began to gather into a figure.
 
 The rest of the menu is **"System default"** and then your capture devices, each remembered by
 **name**, so a composition opened on another day or machine finds the same device if it's
@@ -344,8 +352,9 @@ is another matter.
 
 **The sand doesn't move.** Nothing is pushing the plate hard enough. Look at the rim: amber means
 the device is missing; pulsing red means it's silent (on macOS, the microphone permission; see
-above). No rim cue on "Resolume FFT (no pitch)" means Resolume's analysis is all there is, and
-in Arena 7.29.0 on one Mac it moved nothing even with music playing: choose a device. Or Gain is
+above). No rim cue on "Resolume FFT (no pitch)" means Resolume's analysis is all there is: check
+that music is playing where Resolume's **Audio** setting listens (a demo `.mov` clip has no sound;
+play its `.wav`), or choose a device. Or Gain is
 low, or the music has just got quiet against its recent peak: wait a few seconds or turn Gain
 up.
 
@@ -382,11 +391,9 @@ Windows  %LOCALAPPDATA%\eidophone\logs\eidophone.YYYY-MM-DD.log
   device) and Arena 7.29.0 on a Mac. Nothing is known yet about a whole show, how it performs in
   Resolume, or a real audio input: every sound it has heard was fed to it from a file, never
   captured.
-- **It has never moved to music inside Resolume.** In Arena 7.29.0 on a Mac, with one of
-  Resolume's demo clips playing its own audio on the layer below, 23 snapshots of each plugin a
-  tenth of a second apart were identical, on the defaults and again at Gain 40 g with Bin Law
-  Log: Resolume's sound analysis threw no grain. Why isn't known (the fleet's other audio plugins
-  saw the same on that Mac). If that happens to you, choose a device.
+- **Inside Resolume it has moved only to Resolume's demo stems**, on Resolume's own sound
+  analysis, in Arena 7.29.0 on a Mac: a drum loop made the grains hop at the default Gain. No
+  full mix has been played to it there.
 - **Resolume's FFT has no pitch.** On "Resolume FFT (no pitch)" the note is a guess from the
   loudest band, its centre, so the plate rings at a handful of fixed frequencies (517 Hz, 861 Hz
   and so on under Linear), not at the music's notes.
