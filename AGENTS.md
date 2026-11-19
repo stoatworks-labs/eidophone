@@ -296,7 +296,12 @@ semitones flat** (× 0.919): a tone at 1312.5 Hz, bin 3's centre, drove the plat
   a cleared layer after, Local and External 0 of 11–14 each. On drums the loudest bin hops from
   hit to hit, so the frequency fix changes which modes ring, not whether the sand moves; the
   tones are what show it. No prompt, the .avc files, Arena's preferences and Extra Effects
-  unchanged.
+  unchanged. **The release's own bundles** (v0.1.1's `.zip`, Developer ID-signed, notarised and
+  stapled; build stamp 19:56:37), the same probe at 20:00: the same log lines (bin 3 at
+  1312.5 Hz for both 1312.5 Hz files, bin 2 at 937.5 Hz for 880 Hz, on both plugins), each
+  tone's start 19 of 19 pairs, the 44.1 kHz repeat 12 and 19 of 19 at a twentieth of the
+  motion; `Beat 001.wav` 18 and 11 of 19 at 12 g, 19 and 15 at 40 g; `Bass 001.wav` 13 and 13
+  at 12 g, 16 and 15 at 40 g; silence, cleared, Local, External 0.
 
 ## Would this hold on another rasteriser, at another raster?
 
@@ -488,7 +493,8 @@ grains. One GPU only (an M4 Max); a small GPU or the software renderer is anothe
   show, never a full mix, never a capture device.
 - **Windows on win-lab only.** MSVC builds it on GitHub's runner, and win-lab's Arena 7.27.1
   (llvmpipe, no sound device) passed the fleet's gate on the release workflow's DLLs (15
-  passed, 0 failed, 4 skipped); miniaudio's WASAPI backend has never opened a device.
+  passed, 0 failed, 4 skipped; v0.1.1's release zip the same, 2026-11-19); miniaudio's WASAPI
+  backend has never opened a device, and the host-FFT fix has not been seen on Windows.
 
 ## Browser demo
 

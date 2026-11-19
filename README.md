@@ -44,14 +44,14 @@ the clip and the `Synth 003` WAV as the music, its 225th frame through `--pipe` 
 
 ## Download
 
-**[v0.1.0](https://github.com/stoatworks-labs/eidophone/releases/tag/v0.1.0)** — prebuilt for macOS and Windows. Pick your platform:
+**[v0.1.1](https://github.com/stoatworks-labs/eidophone/releases/tag/v0.1.1)** — prebuilt for macOS and Windows. Pick your platform:
 
 <details>
 <summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
 
 | Build | Download | Size |
 | --- | --- | --- |
-| Universal (Apple Silicon + Intel) · .dmg disk image | [`eidophone-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/eidophone/releases/download/v0.1.0/eidophone-0.1.0-macos-universal.dmg) | 1.3 MB |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`eidophone-0.1.1-macos-universal.dmg`](https://github.com/stoatworks-labs/eidophone/releases/download/v0.1.1/eidophone-0.1.1-macos-universal.dmg) | 1.3 MB |
 | Universal (Apple Silicon + Intel) · .zip archive | [`eidophone-macos-universal.zip`](https://github.com/stoatworks-labs/eidophone/releases/latest/download/eidophone-macos-universal.zip) | 1.2 MB |
 
 </details>
@@ -61,8 +61,8 @@ the clip and the `Synth 003` WAV as the music, its 225th frame through `--pipe` 
 
 | Build | Download | Size |
 | --- | --- | --- |
-| x64 · .exe installer | [`eidophone-0.1.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/eidophone/releases/download/v0.1.0/eidophone-0.1.0-windows-x86_64-setup.exe) | 391 KB |
-| x64 · .zip archive | [`eidophone-windows-x86_64.zip`](https://github.com/stoatworks-labs/eidophone/releases/latest/download/eidophone-windows-x86_64.zip) | 540 KB |
+| x64 · .exe installer | [`eidophone-0.1.1-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/eidophone/releases/download/v0.1.1/eidophone-0.1.1-windows-x86_64-setup.exe) | 396 KB |
+| x64 · .zip archive | [`eidophone-windows-x86_64.zip`](https://github.com/stoatworks-labs/eidophone/releases/latest/download/eidophone-windows-x86_64.zip) | 536 KB |
 
 </details>
 
@@ -252,7 +252,8 @@ peak.
   (Arena's own audio input) nothing moved, 0 of 24 pairs for each plugin, and the Over on Local
   (over a picture-only card, so hearing nothing) lay still too.
 - **v0.1.1 drives the plate at the frequency Resolume's bins hold** (19 November 2026, a
-  pre-tag universal build signed ad hoc, the same set-up). Each plugin's log reads "host audio
+  pre-tag universal build signed ad hoc, then the release's own notarised bundles from its
+  `.zip`, the same set-up both times). Each plugin's log reads "host audio
   at 48000 Hz: Resolume's FFT bins are 375.0 Hz each", and names the bin and frequency once a
   note has held a second. Sines made for the check, on the layer below: **1312.5 Hz** (bin 3's
   centre) drove the plate at **1312.5 Hz**, from a 48 kHz WAV and from a 44.1 kHz one alike
@@ -260,14 +261,17 @@ peak.
   it; v0.1.0 read them at 1205.9 and 861.3 Hz. When each tone started the sand moved in 19 of 19
   pairs on both plugins; the 44.1 kHz copy of the same tone, played next, moved it about a
   twentieth as far, the sand already lying on that mode's lines, and 880 Hz, another mode, threw
-  it again. With the demo loops: `Beat 001.wav` 15 of 19 pairs (Over) and 9 of 19 (source) at
-  12 g, 19 and 19 at 40 g; `Bass 001.wav` 13 and 12 at 12 g, 16 and 16 at 40 g; silence, a
-  cleared layer, Local and External 0. Both register with every control as declared and the
+  it again. With the demo loops (pre-tag; the release's bundles): `Beat 001.wav` 15 and 18 of
+  19 pairs on the Over and 9 and 11 on the source at 12 g, and at 40 g 19 and 19 on the Over,
+  19 and 15 on the source;
+  `Bass 001.wav` 12–13 of 19 at 12 g and 15–16 at 40 g; silence, a cleared layer, Local and
+  External 0 every time. Both register with every control as declared and the
   About line `Eidophone v0.1.1 - MIT - Stoatworks Labs, stoatworks-labs.com`.
-- **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with this
-  release's own x64 DLLs, from its `.zip`, and before the tag with the release workflow's
+- **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with v0.1.0's
+  own x64 DLLs, from its `.zip`, and before that tag with the release workflow's
   pre-tag build: the fleet's Arena gate passed **15** checks, failed none and skipped 4, the
-  same verdicts both times. Both load and register (`ED01`, a source; `ED02`, an
+  same verdicts both times; and v0.1.1's own DLLs, from its `.zip` (19 November 2026), the same
+  15, 0 and 4 again. Both load and register (`ED01`, a source; `ED02`, an
   effect), show all 24 and 26 controls with the declared name, order, type, range and
   default, render, and 7 controls of each move the picture. The 10 and 12 that act only
   through the drive are skipped there (no sound device), and Rescan and Pour (events) are
