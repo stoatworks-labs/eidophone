@@ -51,7 +51,7 @@ departs from it.
   build in `build-verify` with no warnings, both bundles through lipo, nm, plist, ad-hoc
   signature, `oxbow probe` and `selftest`; every check below;
   seven on Apple's software renderer; `--offline`; `--pipe` for both; the negative controls;
-  26 mutants; the sweep; the bench): about two minutes on this Mac.
+  29 mutants; the sweep; the bench): about two and a half minutes on this Mac.
 - **Set `OXBOW`** to a built `oxbow` binary. verify.sh fails without it, never "skipped".
   Build it out of tree: `cmake -S ~/Projects/resolume/oxbow -B <scratch>/oxbow-build &&
   cmake --build <scratch>/oxbow-build` (never inside ~/Projects).
@@ -63,7 +63,10 @@ departs from it.
   the twist, convergence, orthonormality), `--circle` (Bessel roots against a polar Ritz,
   Leissa's Tables 2.5–2.7, Chladni's law), `--plate` (steady state, ring-down, frame rate,
   the centre's symmetry, the rigid shake), `--audio` (pitch, held ω, the seed, the loudness
-  and its running peak, the host FFT's bin).
+  and its running peak, the host FFT's bin on the host's axis, the rate handed over).
+- **The host FFT through the plugin** (GL): `--hostfft` (a sine at a bin's centre, and A4,
+  A5, A6, C8, in a model of Arena's FFT: the plate driven at that bin's centre on a 48 kHz
+  and a 44.1 kHz axis, both plugins, and 48 kHz when no host says).
 - **The grains** (GL, 1280x720 and 320x180 each): `--threshold` (under g, bit for bit),
   `--hop` (the walk's drift and variance), `--nodal` (settled sand on the zero set),
   `--powder` (the current exactly, heaps at the antinodes), `--freeze` (0.7 g moves nothing;
@@ -74,8 +77,8 @@ departs from it.
   `--alpha`, `--redraw`, `--clock` (a 499,000,000 ms host clock), `--resize`, `--state`,
   `--names` (no GL), `--cues` (no GL).
 - `--offline` runs the no-GL checks and their negatives (what CI would run).
-- The checks can fail: `./build/edtest --negative` (21 wrong models), `tools/mutate.sh`
-  (26 one-character mutants, each built arm64-only and run at 320x180 under a 300 s alarm).
+- The checks can fail: `./build/edtest --negative` (25 wrong models), `tools/mutate.sh`
+  (29 one-character mutants, each built arm64-only and run at 320x180 under a 300 s alarm).
 - No dead controls: `python3 tools/sweep.py --build build` (both plugins; `--bare` drops
   the per-control contexts and lists the controls that only act with another one set).
 - Render cost: `./build/edtest --bench` (720p, 1080p and 4K at the defaults; 16,384 and
@@ -104,7 +107,11 @@ departs from it.
   lattice IS the model's peak acceleration.
 - **The audio law** (`source/Audio.cpp`): ω from earshot's voiced pitch, held; loudness the
   band envelopes' RMS; relative to an 8 s released running peak; F₀ = Gain · g · relative /
-  `PeakPerNewton(ω)`. AGENTS.md says why it isn't the spec's.
+  `PeakPerNewton(ω)`. AGENTS.md says why it isn't the spec's. On Resolume's FFT (no pitch) the
+  note is the loudest bin's centre on the host's axis: `SetSampleRate` → `AudioInput::
+  SetHostRate` on the render thread before the bins are read (Arena sends 48000: 64 bins of
+  375 Hz, measured; earshot's 48 kHz until a host says). One `earshot::Config` (`wanted`) for
+  every configure(): a second configure() before the next update() replaces the first.
 - **Grains** are a 512² RGBA32F ping-pong state (x, y, a/g, kind), updated in 1/480 s
   substeps (at most 32 a frame), PCG-hashed per (grain, substep); splatted as whole-pixel
   point squares with an anti-aliased disc into an RG16F density at the output raster.
@@ -119,10 +126,10 @@ departs from it.
 - `eidophone_core` is an OBJECT library: each plugin registers itself from a file-scope
   constructor nothing references.
 - The macOS build must be universal. Check with `lipo`, never the build log.
-- **The earshot snapshot** is earshot (`github.com/stoatworks-labs/earshot`) at `8124191`,
-  unmodified (`external/earshot/SNAPSHOT`). Never edit it; change earshot upstream and take a
-  new archive. Its own CLAUDE.md and AGENTS.md are earshot's as of that commit, status lines
-  and all.
+- **The earshot snapshot** is earshot (`github.com/stoatworks-labs/earshot`) at `02306da`
+  (v0.1.1; v0.1.0 shipped `8124191`), unmodified (`external/earshot/SNAPSHOT`). Never edit it;
+  change earshot upstream and take a new archive. Its own CLAUDE.md and AGENTS.md are
+  earshot's as of that commit, status lines and all.
 - **Generated, don't edit here:** `source/StoatworksAbout.h` (stoatworks-backend's
   `sync-about.py`, from the website's projects.json: the hook and the User guide button)
   and `ATTRIBUTIONS.md` (`sync-attributions.py`, from the backend's `derived.json`, which
@@ -139,7 +146,9 @@ departs from it.
 ## Not done yet
 - Inside Resolume only briefly: in Arena on the Mac (7.29.0) it loaded, drew and answered its
   drawing controls (2026-11-18), and Resolume's FFT threw the sand with `Beat 001.wav` playing
-  on the layer below (2026-11-19; the first day's `Beat 001.mov` has no sound track). On Windows it
+  on the layer below (2026-11-19; the first day's `Beat 001.mov` has no sound track), and v0.1.1
+  drove the plate at the bin's own centre there (a 1312.5 Hz tone at 1312.5 Hz; v0.1.0 read
+  every bin 1.47 semitones flat). On Windows it
   has run only in win-lab's Arena (no GPU, no sound device), through the fleet's gate. No
   real capture device has fed it.
 - No OpenFX port, no presets. The user guide is `docs/USER-GUIDE.md`; the browser demo is
@@ -153,4 +162,7 @@ departs from it.
     %LOCALAPPDATA%\eidophone\logs\eidophone.YYYY-MM-DD.log
 
 `EIDOPHONE_LOG_DIR` overrides the folder. Every capture-state change is logged with
-earshot's status string.
+earshot's status string; the host's audio rate once per change ("host audio at 48000 Hz:
+Resolume's FFT bins are 375.0 Hz each"); and on Resolume's FFT, a note held for a second
+("Resolume FFT note held 1 s: bin 3, 1312.5 Hz (Linear, bins on a 48000 Hz axis)"), once per
+held note. The log is shared by every process that loads the plugin (edtest's runs too).

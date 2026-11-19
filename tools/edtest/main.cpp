@@ -41,6 +41,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <complex>
 #include <csignal>
 #include <cstdarg>
 #include <cstdint>

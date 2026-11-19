@@ -28,9 +28,15 @@ class CaptureBackend;
     **Resolume's FFT** (no device chosen, or a chosen one Opening, Missing or
     Failed): earshot's fallback has NO pitch. The plugin takes the strongest
     of the 64 bins (bin 0 left out) as a guess at the note, at that bin's
-    centre under Bin Law, and the bin's value as the loudness. Nobody has
-    measured Resolume's bins; under Linear every bass note lands in bin 0 or
-    1. It is a guess, and the menu says so: "Resolume FFT (no pitch)".
+    centre under Bin Law, and the bin's value as the loudness. The bins' axis
+    is the host's audio engine rate (FFGL SetSampleRate, handed in by
+    SetHostRate; earshot's 48 kHz until a host sends one). Arena 7.29.0 was
+    measured (earshot's AGENTS.md, "Resolume's 64 bins, measured"): linear,
+    bin j = [j, j+1) x 375 Hz at its 48 kHz engine, also for a 44.1 kHz
+    clip, which is Bin Law Linear's centre ( j + 0.5 ) x 375 Hz. v0.1.0 read
+    them at 44.1 kHz, 1.47 semitones flat (x 0.919). Under Linear every bass
+    note lands in bin 0 or 1. It is a guess, and the menu says so: "Resolume
+    FFT (no pitch)".
 
     **The level** either way is the loudness over its own running peak
     (released with a time constant of kPeakRelease; never under kPeakFloor,
@@ -81,7 +87,9 @@ enum AudioHook : int
 	kHookHzAsOmega   = 1 << 10,///< the pitch in Hz taken as the angular frequency
 	kHookBinZero     = 1 << 11,///< the fallback lets bin 0 (DC and the lowest bass) win
 	kHookMenuByIndex = 1 << 12,///< the menu values devices by position, not by name
-	kHookPeakHeld    = 1 << 14 ///< the running peak never released (1 << 13 is the shaders')
+	kHookPeakHeld    = 1 << 14,///< the running peak never released (1 << 13 is the shaders')
+	kHookIgnoreHostRate = 1 << 15,///< the host's sample rate never reaches the bins' axis (earshot's 48 kHz stays)
+	kHookAssumed441  = 1 << 16 ///< the bins read on a 44.1 kHz axis whatever the host says (v0.1.0's)
 };
 
 /// The running peak: released with this time constant, never under the floor
@@ -91,13 +99,15 @@ constexpr double kPeakRelease = 8.0; ///< s
 constexpr double kPeakFloor   = 0.01;
 constexpr double kGate        = 0.001;
 
-/// The centre of 64-bin bin j under the Bin Law, at earshot's assumed 44.1 kHz.
-double BinHz( int j, BinLaw law, double sampleRate = 44100.0, int bins = 64 );
+/// The centre of bin j of `bins` under the Bin Law, on the axis of a host
+/// whose audio engine runs at `sampleRate` (Nyquist = sampleRate / 2).
+double BinHz( int j, BinLaw law, double sampleRate, int bins = 64 );
 
 /// The frequency and loudness from one earshot frame (device path) or the
-/// raw host bins (fallback). `previousOmega` is held when there is no note;
-/// `relative` is left to AudioInput, which keeps the running peak.
-Drive DriveFrom( const earshot::Frame& frame, const float* bins, int binCount, BinLaw law, double previousOmega, int hooks = 0 );
+/// raw host bins (fallback), read on `hostRate`'s axis. `previousOmega` is
+/// held when there is no note; `relative` is left to AudioInput, which keeps
+/// the running peak.
+Drive DriveFrom( const earshot::Frame& frame, const float* bins, int binCount, BinLaw law, double hostRate, double previousOmega, int hooks = 0 );
 
 /// One step of the running peak: max( loudness, peak e^( -dt / kPeakRelease ) ),
 /// never under kPeakFloor.
@@ -130,6 +140,14 @@ public:
 		return requested;
 	}
 
+	/// The host's audio engine rate (FFGL SetSampleRate): the axis of its FFT
+	/// bins, for earshot's host law and the fallback's note. Applied when it
+	/// changes, and logged once per change; 0, or a rate no engine runs at,
+	/// keeps what earshot has (48 kHz until a host says otherwise).
+	void SetHostRate( unsigned int rate );
+	/// The rate the host's bins are read at.
+	double HostRate() const;
+
 	/// Once per frame.
 	Drive Update( double hostSeconds, const float* bins, int binCount, double clarity, BinLaw law );
 
@@ -146,6 +164,7 @@ public:
 	int hooks = 0;///< AudioHook bits (harness only)
 
 private:
+	earshot::Config wanted;///< what earshot is given: construction, Clarity and the host's rate all edit this one
 	std::unique_ptr< earshot::Engine > engine;
 	std::vector< DeviceSlot > slots;
 	std::map< float, std::string > seen;///< every key met in this process, and its name
@@ -156,6 +175,10 @@ private:
 	double lastOmega      = 0.0;
 	double peak           = kPeakFloor;
 	double lastSeconds    = -1.0;
+	unsigned int hostRate = 0;///< the last rate handed to earshot, 0 none
+	int heldBin           = -1;///< the fallback's note: the bin taken, and since when
+	double heldSince      = 0.0;
+	int loggedBin         = -1;///< the last held note the log was told of
 	uint32_t generation   = 0;
 	earshot::CaptureState lastState = earshot::CaptureState::Closed;
 };

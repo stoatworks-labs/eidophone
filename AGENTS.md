@@ -33,9 +33,12 @@ negative, a loud note far from every mode smears it all, and high notes draw slo
 
 ## The earshot snapshot
 
-`external/earshot/` is earshot (`github.com/stoatworks-labs/earshot`) at commit **`8124191`**
-("estest: a negative control for every check, enforced"), taken 2026-11-16 with `git archive
-8124191`, **unmodified, no patches**. `external/earshot/SNAPSHOT` records the same. verify.sh
+`external/earshot/` is earshot (`github.com/stoatworks-labs/earshot`) at commit **`02306da`**
+("Host bins: share each bin by overlap; Arena's measured law as default (0.1.1)"), taken
+2026-11-19 with `git archive 02306da`, **unmodified, no patches**. `external/earshot/SNAPSHOT`
+records the same. (v0.1.0 shipped `8124191`, taken 2026-11-16: its host-bin law assumed
+44.1 kHz, which put eidophone's host-FFT note 1.47 semitones flat in Arena; see "The host FFT's
+axis, measured" below.) verify.sh
 checks that SNAPSHOT and this file agree on the commit, and, when an earshot checkout is
 present (`EARSHOT`, default `~/Projects/resolume/earshot`), that the snapshot's files are byte-for-byte that commit's. To update: take a new archive,
 change both records, rerun verify. Never edit files under `external/earshot/`; change earshot
@@ -101,8 +104,13 @@ tones, and `earshot::testing::CaptureBackend` so no step of the harness opens a 
   FFT or by a note's partials. Left as is; a smaller plate moves every mode up.
 - **The host FFT has no pitch**, and the menu says so: element 0 is
   "Resolume FFT (no pitch)". The plugin takes the strongest of the 64 bins (never bin 0) at
-  its centre under Bin Law (44.1 kHz assumed) and its value as the loudness. Under Linear
-  the bins are 345 Hz wide.
+  its centre under Bin Law, on the host's axis (FFGL `SetSampleRate`; earshot's measured
+  48 kHz until a host sends one), and its value as the loudness. Under Linear the bins are
+  375 Hz wide in Arena (v0.1.0 assumed 44.1 kHz, 344.5 Hz: see below).
+- **Bin Law's default, Linear, is the law Arena 7.29.0 was measured to use**, so it stays;
+  Log stays too, as configuration for an unmeasured host. Under Log the same 64 bins run
+  from 20 Hz to the Nyquist: in Arena a tone in bin 3 (1312.5 Hz) drives the plate at
+  29.5 Hz, 65.7 semitones down (`--hostfft`), so the guide says Arena's is Linear.
 - **Generated since registration (2026-11-18):** `source/StoatworksAbout.h` by
   stoatworks-backend's `sync-about.py` (the hook and a User guide button, so 24 and 25
   parameters) and `ATTRIBUTIONS.md` by `sync-attributions.py`, whose earshot row is
@@ -164,6 +172,16 @@ tones, and `earshot::testing::CaptureBackend` so no step of the harness opens a 
   `cp -p` and sleeps 1.1 s so a mutated file is always newer than its object.
 - **`oxbow` isn't built at the path verify.sh used to default to.** verify.sh now requires
   `OXBOW` and fails without it; it never prints "skipped".
+- **A second `configure()` before the next `update()` replaces the first** (earshot's
+  `Engine::configure` is applied at the next update, and only the last one). v0.1.1's first
+  cut set the host's rate on a config and then, in the same frame's Clarity change, built a
+  config from `engine->config()` (still the old one): the 44.1 kHz rate was lost on the first
+  frame. `--audio` and `--hostfft` both failed it. Now one `earshot::Config` (`wanted`) is
+  edited by construction, Clarity and the host rate alike, and every configure() passes it.
+- **`--audio` read `HostRate()` before an update**, so it saw the rate before the pending
+  configure landed. It reads it after.
+- **mutate.sh splits its table on `|`**, so a mutant whose target holds `||` was cut short and
+  "survived". The target is now a substring with no `|` in it.
 
 ## Verified, and assumed
 
@@ -185,7 +203,11 @@ green, 2 min 2 s) and the checks' own output. The grain checks give the same num
 - audio: a 440 Hz sine at −20 dBFS gives 440.00 Hz and −20.00 dBFS; 20 dB down for 2 s,
   relative 0.1284 against the 8 s release's 0.1284; silence holds ω; a two-partial chord
   seeds 623.09 Hz, a 330 Hz sine then 330.00 Hz, held; the host FFT's strongest bin under
-  each Bin Law, never bin 0;
+  each Bin Law, never bin 0; (v0.1.1, 2026-11-19, verify green in 2 min 21 s) on the host's
+  axis, 48 kHz until told, then 44.1, 48 or 96 kHz as told;
+- the host FFT through the plugin (v0.1.1, `--hostfft`): sines at bin centres drive the plate
+  at their own pitch, 0 semitones off, at 48 and 44.1 kHz, both plugins; other notes at the
+  centre of the bin holding them, at most 126.5 Hz off at 48 kHz (half a bin 187.5);
 - the menu: 17 elements, devices valued by `deviceKey(name)`, Missing amber (7.8e-6) and
   Silent red (4.1e-6) on the rim, a 0.3 s open never stalls a frame (the next frame 0.5 ms),
   a device found again by name on Rescan;
@@ -211,16 +233,70 @@ green, 2 min 2 s) and the checks' own output. The grain checks give the same num
 - redraw 0 substeps at an unchanged host time; clock dt to 6.2e-11 s at 499,000,000 ms;
   resize 0 bytes, both plugins, two shapes; state 0 wrong; names 23 and 24 parameters; cues;
 - `--pipe`, `--film`, a bad cue and a bad option refused, `| head -c 1` exits 1, both;
-- 21 negative controls, 26 mutants, 0 dead controls (17 + 18 swept), 7 shaders through
+- 21 negative controls, 26 mutants (v0.1.1: 25 and 29), 0 dead controls (17 + 18 swept), 7 shaders through
   glslc, both bundles universal and read by `oxbow` (`SW Eidophone`/`ED01`/source,
   `SW Eido Over`/`ED02`/effect) with `oxbow selftest` passing.
 
 Assumed, not measured: Q (one damping ratio for every mode); the ideal force source and the
 free plate (no driver mass or suspension); rigid-body modes in steady state; the hop's form,
 β = 1 and H; the powder current's form and P; the rim reflecting (a real plate's sand falls
-off); the field held over a frame's substeps; the host bins' law, value and 44.1 kHz rate;
+off); the field held over a frame's substeps; the host bins' law and value anywhere but
+Arena 7.29.0 on the Mac (measured there, below);
 the colours; how Resolume's FFT levels compare with the harness's (in Arena on the Mac a demo
 drum loop throws the sand at the default Gain: README, In Resolume).
+
+## The host FFT's axis, measured (v0.1.1)
+
+On "Resolume FFT (no pitch)" the plugin's note is the centre of the loudest bin but bin 0, so
+the bins' axis is the note. v0.1.0 read them on earshot `8124191`'s `HostBins()`, 44.1 kHz
+(bin j's centre (j + ½) × 344.53 Hz under Linear). earshot's AGENTS.md ("Resolume's 64 bins,
+measured", 2026-11-19) measured Arena 7.29.0 on the Mac: linear, magnitude, mono, 64 bins of
+**375 Hz** from 0 to 24 kHz (its audio engine's 48 kHz, also for a 44.1 kHz clip), refreshed
+about every 43 ms and held between. So every v0.1.0 note on Resolume's FFT was **1.47
+semitones flat** (× 0.919): a tone at 1312.5 Hz, bin 3's centre, drove the plate at 1205.9 Hz.
+
+- **The fix**: the plugin overrides FFGL `SetSampleRate`, keeps the rate in an atomic (the
+  SDK's own `sampleRate` member is never initialised) and hands it to `AudioInput::SetHostRate`
+  on the render thread before the bins are read; that sets earshot's `hostBins.sampleRate`
+  (through the one `wanted` Config: see the traps) and logs it once per change. `DriveFrom`
+  reads the bin's centre on the rate earshot holds, which is 48 kHz (earshot `02306da`'s
+  default, Arena's) until a host says otherwise. A rate under 8 kHz or over 768 kHz, or 0, is
+  ignored.
+- **`--hostfft`** (GL, both plugins) makes 64 bins the way Arena was measured to make them
+  (sgtest's model: a 2048-point Hann FFT, 16 fine bins summed per bin, |X|/2N, held 2048
+  samples), from a sine at −12 dBFS over a louder 49 Hz bass at −6 dBFS (all in bin 0, which
+  the fallback never takes), and hands them to the plugin's FFT buffer with the rate through
+  `SetSampleRate`. Five sines at bin centres (bins 1, 3, 8, 20, 45) drive the plate at their own
+  pitch, **0** semitones off, at 48 kHz and at 44.1 kHz, source and Over; A4, A5, A6 and C8 at
+  the centre of the bin holding them, at most 126.5 Hz off at 48 kHz (half a bin 187.5) and
+  134.9 Hz at 44.1 kHz (half a bin 172.3); ω = 2πf and the grains' ω the drive's; a plugin never
+  told a rate reads 48 kHz; a rate of 0 keeps 48 kHz.
+- **Against v0.1.0** (its tag's tree with these checks and test-only shims, `SetHostRate` a
+  no-op): every 48 kHz pass fails, 9 wrong of 9 (562.5 Hz → bin 1 at 516.8 Hz, −1.47
+  semitones; the worst 223.9 Hz off in bin 11); 44.1 kHz passes; and `--audio` fails 21
+  expectations. The new negative controls (the host rate ignored; the bins on 44.1 kHz whatever
+  the host says; bin 0 allowed) fail it; three new mutants are caught.
+- **Bin Law's default is right.** Linear is the measured law. Log, kept as configuration for
+  an unmeasured host, puts the same bin 3 at 29.5 Hz, 65.7 semitones down.
+- **In Arena 7.29.0 on the Mac** (2026-11-19, a pre-tag universal build signed ad hoc, mounted
+  over the REST API as in the re-test: the Over on a card, then the source, Device on
+  "Resolume FFT (no pitch)", Audio on Composition, the audio on layer 1). The log, per plugin:
+  "host audio at 48000 Hz: Resolume's FFT bins are 375.0 Hz each" (Arena's `SetSampleRate`).
+  Three tones made for the check (−12 dBFS, 20 s, stereo): 1312.5 Hz at 48 kHz, the same at
+  44.1 kHz, and 880 Hz at 48 kHz. The held-note log line read bin 3, 1312.5 Hz for both
+  1312.5 Hz files (Arena resamples a 44.1 kHz clip into its 48 kHz engine, as earshot measured)
+  and bin 2, 937.5 Hz for 880 Hz, on both plugins; v0.1.0 would read 1205.9 and 861.3 Hz.
+  Snapshot pairs about a fifth of a second apart, 19 a burst: each tone's start moved the sand
+  in 19 of 19 (mean motion 2.2 and 1.7 for 1312.5 Hz at 48 kHz, Over and source); the 44.1 kHz
+  copy, played next on the same mode, moved it a twentieth as far (mean 0.08 and 0.12; 12 and
+  19 of 19 pairs), the sand already on that mode's nodal lines; 880 Hz, another mode, threw it
+  again (19 of 19, mean 0.8 and 0.6). The demo loops against v0.1.0's re-test (Over, source):
+  `Beat 001.wav` at 12 g 15 and 9 of 19 (v0.1.0 16 and 9), at 40 g 19 and 19 (19 and 15);
+  `Bass 001.wav` at 40 g 16 and 16 (14 and 14), at 12 g 13 and 12 (12 and 13); silence before,
+  a cleared layer after, Local and External 0 of 11–14 each. On drums the loudest bin hops from
+  hit to hit, so the frequency fix changes which modes ring, not whether the sand moves; the
+  tones are what show it. No prompt, the .avc files, Arena's preferences and Extra Effects
+  unchanged.
 
 ## Would this hold on another rasteriser, at another raster?
 
@@ -251,8 +327,9 @@ reruns `state threshold hop splat alpha redraw clock` there every time.
 
 ## The negative controls and mutants
 
-`edtest --negative`: 21 wrong models, each must fail its check (and each check also asserts
-the thing measured happened: grains thrown and held, a mode rung, a note heard).
+`edtest --negative`: 25 wrong models, each must fail its check (and each check also asserts
+the thing measured happened: grains thrown and held, a mode rung, a note heard). The four
+v0.1.1 added are marked.
 
 | check | the wrong model | failed |
 | --- | --- | --- |
@@ -265,6 +342,10 @@ the thing measured happened: grains thrown and held, a mode rung, a note heard).
 | audio | the pitch in Hz taken as rad/s | 3 |
 | audio | the fallback lets bin 0 win | 1 |
 | audio | the running peak never released | 1 |
+| audio | the host's bins read at 44.1 kHz whatever the host says (v0.1.0's; v0.1.1) | 1 |
+| hostfft | the host's bins read at 44.1 kHz whatever the host says (v0.1.1) | 4 |
+| hostfft | the host's sample rate never reaches the bins' axis (v0.1.1) | 2 |
+| hostfft | the fallback lets bin 0 win (v0.1.1) | 6 |
 | device | the menu values devices by position, not by name | 4 |
 | select | the pitch in Hz taken as rad/s | 6 |
 | threshold | grains hop at a > g/2 | 2 |
@@ -281,9 +362,10 @@ the thing measured happened: grains thrown and held, a mode rung, a note heard).
 No natural wrong model for `--redraw`, `--clock`, `--resize`, `--state` or `--names`;
 a mutant covers the clock.
 
-`tools/mutate.sh`: 26 one-character mutants of the shipped code, built once into a pristine
+`tools/mutate.sh`: 29 one-character mutants of the shipped code, built once into a pristine
 tree, each copied and rebuilt arm64-only, run at 320×180 under a 300 s alarm (a timeout counts
-as caught). All 26 caught on 2026-11-16.
+as caught). All 26 caught on 2026-11-16; all 29 on 2026-11-19 (the three host-rate mutants
+added for v0.1.1).
 
 | file | the mutant | caught by |
 | --- | --- | --- |
@@ -311,6 +393,9 @@ as caught). All 26 caught on 2026-11-16.
 | Modes.cpp | the circle's shear condition with −(1 − ν)n² | `--circle` |
 | Audio.h | the running peak released at 9 s | `--audio` (survived until the 8 s was a literal) |
 | Audio.cpp | a bin's centre a tenth of a bin high | `--audio` (survived until the centre was computed independently) |
+| Audio.cpp | the bins' axis to 0.6 of the host's rate, not its Nyquist (v0.1.1) | `--audio` |
+| Audio.cpp | every host rate refused, the bins left at 48 kHz (v0.1.1) | `--audio` |
+| Eidophone.cpp | the host's rate never handed to earshot (v0.1.1) | `--hostfft` |
 | Audio.cpp | every device opened as the system default | `--device` |
 | Eidophone.cpp | the substep clock keeping what it ran | `--clock` |
 
@@ -392,12 +477,15 @@ grains. One GPU only (an M4 Max); a small GPU or the software renderer is anothe
 - **Iguchi's 65.3680** (SS-A, ν 0.3) has no counterpart anywhere in the converged spectrum,
   and Leissa's Table 4.67 "more precise upper bounds" column (ref 4.76) lies below converged
   values; both are excluded from the checks, unexplained.
-- **Moved to music inside Resolume only on its FFT, with demo stems.** In Arena 7.29.0 on the
-  Mac (2026-11-18) both plugins registered, drew and answered their drawing controls; that
-  day's music test played `Beat 001.mov`, which has no audio stream, so nothing moved. Re-tested
-  2026-11-19 with `Beat 001.wav` below on Composition: grains hopped in 16 of 19 snapshot pairs
-  (Over) and 9 of 19 (source) at 12 g, 19 and 15 of 19 at 40 g; External and silence moved
-  nothing. Never in a show.
+- **Moved to music inside Resolume only on its FFT, with demo stems and test tones.** In Arena
+  7.29.0 on the Mac (2026-11-18) both plugins registered, drew and answered their drawing
+  controls; that day's music test played `Beat 001.mov`, which has no audio stream, so nothing
+  moved. Re-tested 2026-11-19 with `Beat 001.wav` below on Composition: grains hopped in 16 of
+  19 snapshot pairs (Over) and 9 of 19 (source) at 12 g, 19 and 15 of 19 at 40 g; External and
+  silence moved nothing. The note it drove there was 1.47 semitones flat: v0.1.1 reads the
+  bins on Arena's 48 kHz axis, and in Arena a 1312.5 Hz tone drove the plate at 1312.5 Hz
+  (above, "The host FFT's axis, measured"). Closed for the FFT's frequency; still never in a
+  show, never a full mix, never a capture device.
 - **Windows on win-lab only.** MSVC builds it on GitHub's runner, and win-lab's Arena 7.27.1
   (llvmpipe, no sound device) passed the fleet's gate on the release workflow's DLLs (15
   passed, 0 failed, 4 skipped); miniaudio's WASAPI backend has never opened a device.
@@ -456,7 +544,8 @@ and fountain's.
   7 s, then the centre modes 96.57 Hz (the star) for 7 s, 188.22 for 9, 257.61 for 10 and
   428.69, edtest `--tone 0`, for 12, looped every 52.5 s); edtest `--bins 1` (nothing fed;
   the plugin's fallback, the one behind its default Device, on the made-up buffer, written
-  once: 516.8 Hz under Linear, 23.6 Hz under Log); and a file of the visitor's, decoded by
+  once: 562.5 Hz under Linear, 23.6 Hz under Log, on earshot's 48 kHz axis, since the page
+  sends no rate; v0.1.0's page read 516.8 Hz on 44.1 kHz); and a file of the visitor's, decoded by
   `decodeAudioData` in an `OfflineAudioContext` at 48 kHz (no output device), mono to both
   channels, looped (edtest `--wav` plays once). Before the frame at page time t every sample to
   (t + 1/60) × 48 000 has been fed, as edtest's Feeder feeds frame f to (f + 1)/fps. Nothing is
@@ -520,7 +609,8 @@ and fountain's.
   both (the source in Fit, the Over in Fill with Mix 100%), and switching the plugin resets to
   that constructor's defaults; the corner arcs and the ring round the stem are drawn within
   2.4 s of loading, and the star when its note comes; Shape changes the picture paused, and Gain
-  one slider step changes it (the negative control above); the fallback reads 516.8 Hz; a 44.1 kHz
+  one slider step changes it (the negative control above); the fallback reads 516.8 Hz (v0.1.0's
+  44.1 kHz axis; the v0.1.1 page reads 562.5 Hz, and this comparison was not run again); a 44.1 kHz
   mono WAV of 188.22 Hz chosen through the file input decodes and gives earshot's pitch
   188.22 Hz on the mode at 188.22 Hz; all twelve presets render with no GL error; Defaults
   gives the constructor's values back and two Restarts give the same first frame; embed mode

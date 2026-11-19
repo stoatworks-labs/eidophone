@@ -12,6 +12,7 @@
 #include "StoatworksAboutParams.h"
 
 #include <array>
+#include <atomic>
 #include <complex>
 #include <cstdint>
 #include <memory>
@@ -73,6 +74,9 @@ public:
 	char* GetTextParameter( unsigned int index ) override;
 	FFResult SetTextParameter( unsigned int index, const char* value ) override;
 	FFResult SetTime( double time ) override;
+	/// The host's audio engine rate: the axis of its FFT buffer (earshot's
+	/// AGENTS.md, "Resolume's 64 bins, measured"). Arena sends 48000.
+	void SetSampleRate( unsigned int rate ) override;
 
 	bool IsEffect() const
 	{
@@ -220,6 +224,9 @@ private:
 	bool pourPending = false;
 	bool rescanHeld  = false;
 	int hooks        = 0;
+	/// SetSampleRate's, 0 until the host sends one. Atomic: a host may call
+	/// SetSampleRate from another thread than the frame's.
+	std::atomic< unsigned int > hostRate { 0 };
 };
 
 } // namespace eido

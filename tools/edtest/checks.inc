@@ -629,31 +629,64 @@ int runAudio( const Perturb& perturb )
 		            byName ? "yes" : "NO", spare ? "yes" : "NO", missing ? "yes" : "NO", fallback ? "yes" : "NO" ) );
 	}
 	{
-		AudioInput audio;
-		audio.hooks = perturb.hooks;
-		int wrong   = 0;
+		//The host's axis: earshot's 48 kHz until the host says otherwise (a
+		//rate no engine runs at is ignored), then the host's, 64 bins to its
+		//Nyquist (earshot's AGENTS.md, "Resolume's 64 bins, measured"). One
+		//instance never told; one told 44.1 kHz before its first frame (when
+		//Clarity is applied too, which must not undo it), then 7 Hz, 48 and
+		//96 kHz.
+		int wrong = 0;
 		std::string what;
-		for( BinLaw law : { BinLaw::Linear, BinLaw::Log } )
-			for( int peak : { 1, 9, 40 } )
+		double t = 1.0;
+		auto peaks = [ & ]( AudioInput& audio, unsigned int set, double rate ) {
+			for( BinLaw law : { BinLaw::Linear, BinLaw::Log } )
+				for( int peak : { 1, 9, 40 } )
+				{
+					float bins[ 64 ];
+					for( int j = 0; j < 64; ++j )
+						bins[ j ] = 0.02f;
+					bins[ 0 ]    = 0.9f;//DC and the lowest bass: loud, and never the note
+					bins[ peak ] = 0.5f;
+					t += 1.0;
+					const Drive d = audio.Update( t, bins, 64, 0.8, law );
+					//The spec's centres, written out here rather than called: 64 bins to the axis's Nyquist.
+					const double nyquist = 0.5 * rate;
+					const double u       = ( peak + 0.5 ) / 64.0;
+					const double centre  = law == BinLaw::Log ? 20.0 * std::pow( nyquist / 20.0, u ) : u * nyquist;
+					const bool ok = d.note && !d.fromDevice && d.bin == peak && std::fabs( d.hz / centre - 1.0 ) < 1e-12 && d.omega == 2.0 * kPi * d.hz
+					                && d.loudness == 0.5 && d.relative == 1.0;
+					wrong += !ok;
+					if( !ok )
+						what += fmt( " %.0f Hz %s bin %d -> bin %d %.1f Hz (want %.1f), loudness %.3f, relative %.3f;", rate,
+						             law == BinLaw::Log ? "Log" : "Linear", peak, d.bin, d.hz, centre, d.loudness, d.relative );
+				}
+			const bool rateOk = audio.HostRate() == rate;
+			wrong += !rateOk;
+			if( !rateOk )
+				what += fmt( " SetHostRate( %u ) read the bins at %.0f Hz, not %.0f;", set, audio.HostRate(), rate );
+		};
+		{
+			AudioInput audio;
+			audio.hooks = perturb.hooks;
+			peaks( audio, 0u, 48000.0 );
+		}
+		{
+			AudioInput audio;
+			audio.hooks = perturb.hooks;
+			struct Axis
 			{
-				float bins[ 64 ];
-				for( int j = 0; j < 64; ++j )
-					bins[ j ] = 0.02f;
-				bins[ 0 ]    = 0.9f;//DC and the lowest bass: loud, and never the note
-				bins[ peak ] = 0.5f;
-				const Drive d = audio.Update( 1.0 + peak, bins, 64, 0.8, law );
-				//The spec's centres, written out here rather than called: 44.1 kHz, 64 bins.
-				const double u      = ( peak + 0.5 ) / 64.0;
-				const double centre = law == BinLaw::Log ? 20.0 * std::pow( 22050.0 / 20.0, u ) : u * 22050.0;
-				const bool ok = d.note && !d.fromDevice && d.bin == peak && std::fabs( d.hz / centre - 1.0 ) < 1e-12 && d.omega == 2.0 * kPi * d.hz
-				                && d.loudness == 0.5 && d.relative == 1.0;
-				wrong += !ok;
-				if( !ok )
-					what += fmt( " %s bin %d -> bin %d %.1f Hz, loudness %.3f, relative %.3f;", law == BinLaw::Log ? "Log" : "Linear", peak, d.bin, d.hz,
-					             d.loudness, d.relative );
+				unsigned int set;
+				double rate;
+			};
+			for( const Axis& axis : { Axis { 44100u, 44100.0 }, Axis { 7u, 44100.0 }, Axis { 48000u, 48000.0 }, Axis { 96000u, 96000.0 } } )
+			{
+				audio.SetHostRate( axis.set );
+				peaks( audio, axis.set, axis.rate );
 			}
-		Check( wrong == 0, fmt( "the host FFT, bin 0 loudest: the note is the strongest other bin, at its centre under each Bin Law, its value the "
-		                        "loudness (%d wrong:%s)",
+		}
+		Check( wrong == 0, fmt( "the host FFT, bin 0 loudest: the note is the strongest other bin, at its centre under each Bin Law on the host's axis "
+		                        "(48 kHz before any SetHostRate, then 44.1, 48 and 96 kHz as set; a rate of 7 Hz ignored), its value the loudness "
+		                        "(%d wrong:%s)",
 		                        wrong, what.empty() ? " none" : what.c_str() ) );
 	}
 	{
@@ -728,6 +761,212 @@ int runAudio( const Perturb& perturb )
 		Check( seeded && pitched && kept, fmt( "440 + 623 Hz at clarity 0.99 (unvoiced), nothing before: the louder partial, %.2f Hz; a 330 Hz sine then sets "
 		                                       "%.2f Hz; the unvoiced pair again keeps it: %.2f Hz",
 		                                       seedHz, pitchHz, d.omega / ( 2.0 * kPi ) ) );
+	}
+	return Verdict();
+}
+
+//===========================================================================
+// --hostfft (GL): the plate's drive on Resolume's own FFT, through the
+// plugin. A sine becomes the 64 bins Arena 7.29.0 was measured to send
+// (earshot's AGENTS.md, "Resolume's 64 bins, measured") and is handed to the
+// plugin as its FF_USAGE_FFT buffer, element by element, as a host does, with
+// the host's rate by SetSampleRate; nothing goes through feed(). v0.1.0 read
+// the bins at 44.1 kHz whatever the host ran at: against Arena's 48 kHz
+// engine every note 1.47 semitones flat (x 0.919).
+//===========================================================================
+
+/// Arena's FFT buffer as measured (snowglobe's sgtest --hostfft, the same
+/// model): every 2048 samples of the engine's rate, a 2048-point Hann-windowed
+/// DFT of the newest 2048 samples of the mono sum, and bin k the sum of
+/// |X_i| / 2N over the 16 fine bins 16k .. 16k + 15. So linear, fs / 128 a
+/// bin (375 Hz at 48 kHz) to fs / 2, a magnitude, a sine of amplitude A
+/// reading about A / 4 in its bin. Held between updates, as Arena holds it.
+struct HostSpectrum
+{
+	static constexpr int kN = 2048;
+	int rate;
+	std::function< double( double ) > signal;
+	std::vector< float > bins = std::vector< float >( 64, 0.0f );
+	int64_t updated           = -1;
+
+	HostSpectrum( int r, std::function< double( double ) > s ) : rate( r ), signal( std::move( s ) ) {}
+
+	const std::vector< float >& at( double t )
+	{
+		const int64_t u = static_cast< int64_t >( std::floor( t * rate / kN + 1e-9 ) );
+		if( u == updated )
+			return bins;
+		updated = u;
+		std::vector< std::complex< double > > x( kN );
+		for( int n = 0; n < kN; ++n )
+		{
+			const int64_t sample = u * kN - kN + n;
+			const double hann    = 0.5 - 0.5 * std::cos( 2.0 * kPi * n / kN );
+			x[ static_cast< size_t >( n ) ] = sample < 0 ? 0.0 : hann * signal( static_cast< double >( sample ) / rate );
+		}
+		//Radix-2, in place.
+		for( int i = 1, j = 0; i < kN; ++i )
+		{
+			int bit = kN >> 1;
+			for( ; j & bit; bit >>= 1 )
+				j ^= bit;
+			j ^= bit;
+			if( i < j )
+				std::swap( x[ static_cast< size_t >( i ) ], x[ static_cast< size_t >( j ) ] );
+		}
+		for( int len = 2; len <= kN; len <<= 1 )
+		{
+			const std::complex< double > w = std::polar( 1.0, -2.0 * kPi / len );
+			for( int i = 0; i < kN; i += len )
+			{
+				std::complex< double > wk( 1.0, 0.0 );
+				for( int k = 0; k < len / 2; ++k )
+				{
+					const auto a = x[ static_cast< size_t >( i + k ) ], b = x[ static_cast< size_t >( i + k + len / 2 ) ] * wk;
+					x[ static_cast< size_t >( i + k ) ]           = a + b;
+					x[ static_cast< size_t >( i + k + len / 2 ) ] = a - b;
+					wk *= w;
+				}
+			}
+		}
+		for( int k = 0; k < 64; ++k )
+		{
+			double sum = 0.0;
+			for( int i = 16 * k; i < 16 * k + 16; ++i )
+				sum += std::abs( x[ static_cast< size_t >( i ) ] );
+			bins[ static_cast< size_t >( k ) ] = static_cast< float >( sum / ( 2.0 * kN ) );
+		}
+		return bins;
+	}
+};
+
+int runHostFft( const Perturb& perturb )
+{
+	std::printf( "\n=== hostfft: the drive on Resolume's FFT alone (the bins as Arena 7.29.0 sends them, nothing fed, the host's rate by SetSampleRate): "
+	             "a sine at a bin's centre drives the plate at its own pitch, at 48 and at 44.1 kHz; any other sine at the centre of the bin "
+	             "holding it, never more than half a bin off; over a louder bass in bin 0; with no rate sent, 48 kHz; Bin Law's default is the "
+	             "measured Linear\n" );
+	const Raster raster = kRasters.back();
+	//A -12 dBFS sine (amplitude 0.25, about 0.06 in its bin) over a 49 Hz bass
+	//at -6 dBFS in bin 0, twice as loud there: music's bin 0 is its loudest.
+	auto toneOverBass = []( double hz ) {
+		return [ hz ]( double t ) { return 0.25 * std::sin( 2.0 * kPi * hz * t ) + 0.5 * std::sin( 2.0 * kPi * 49.0 * t ); };
+	};
+	struct Tone
+	{
+		double hz;
+		bool centred;///< at a bin's centre: the drive must be the tone's pitch
+	};
+	//The bin centres ( j + 0.5 ) fs / 128 for j = 1, 3, 8, 20, 45, and A4, A5, A6
+	//and C8, which sit inside bins (none within two fine bins of an edge at
+	//either rate).
+	auto tonesAt = []( int rate ) {
+		std::vector< Tone > tones;
+		for( int j : { 1, 3, 8, 20, 45 } )
+			tones.push_back( { ( j + 0.5 ) * rate / 128.0, true } );
+		for( double hz : { 440.0, 880.0, 1760.0, 4186.01 } )
+			tones.push_back( { hz, false } );
+		return tones;
+	};
+	//30 frames a tone at 60 fps: the spectrum is held 43 ms, so a new tone is
+	//whole in the buffer after two updates (85 ms) and the last frame reads it.
+	auto drive = [ & ]( Rig& rig, int rate, const Tone& tone ) {
+		HostSpectrum host( rate, toneOverBass( tone.hz ) );
+		const double start = rig.Seconds( rig.frame );
+		rig.beforeFrame    = [ &rig, &host, start ]( int f ) {
+			const std::vector< float >& b = host.at( rig.Seconds( f ) - start );
+			const unsigned int index      = static_cast< unsigned int >( rig.plugin.HostIndexOf( PT_AUDIO ) );
+			for( unsigned int j = 0; j < 64; ++j )
+				rig.plugin.SetParamElementValue( index, j, b[ j ] );
+		};
+		const bool ok   = rig.Render( 30 );
+		rig.beforeFrame = nullptr;
+		return ok;
+	};
+	struct Pass
+	{
+		int rate;      ///< the engine rate the bins are made at
+		bool sendRate; ///< SetSampleRate( rate ) first (false: the host never says)
+		bool over;
+	};
+	//One instance per plugin: the source at 48 kHz then 44.1 kHz, the Over at
+	//44.1 kHz from its first frame then 48 kHz (the rate taken before the
+	//first frame, and followed when it changes), and an instance the host
+	//never tells.
+	const Pass passes[] = { { 48000, true, false }, { 44100, true, false }, { 44100, true, true }, { 48000, true, true }, { 48000, false, false } };
+	std::unique_ptr< Rig > rig;
+	bool lastOver = false;
+	for( const Pass& pass : passes )
+	{
+		if( !rig || pass.over != lastOver || !pass.sendRate )
+		{
+			rig      = std::make_unique< Rig >( pass.over );
+			lastOver = pass.over;
+			if( !startRig( *rig, raster.w, raster.h, perturb ) )
+				return 1;
+			rig->Set( PT_DEVICE, 0.0f );//"Resolume FFT (no pitch)", the default
+			rig->Set( PT_BIN_LAW, static_cast< float >( BinLaw::Linear ) );
+		}
+		if( pass.sendRate )
+			rig->plugin.SetSampleRate( static_cast< unsigned int >( pass.rate ) );
+		const double binHz = pass.rate / 128.0;
+		int wrong = 0, worstOffCentre = 0;
+		double worstSemis = 0.0, worstOff = 0.0;
+		std::string what;
+		for( const Tone& tone : tonesAt( pass.rate ) )
+		{
+			if( !drive( *rig, pass.rate, tone ) )
+				return 1;
+			const FrameData& fd = rig->plugin.LastFrame();
+			const int holds     = static_cast< int >( std::floor( tone.hz / binHz ) );
+			const double centre = ( holds + 0.5 ) * binHz;//the Linear centre, written out
+			const double semis  = 12.0 * std::log2( fd.drive.hz / tone.hz );
+			const bool ok       = fd.drive.note && !fd.drive.fromDevice && fd.drive.bin == holds && std::fabs( fd.drive.hz / centre - 1.0 ) < 1e-9
+			                && std::fabs( fd.drive.omega / ( 2.0 * kPi * fd.drive.hz ) - 1.0 ) < 1e-12 && fd.omega == fd.drive.omega && fd.drive.F0 > 0.0
+			                && ( !tone.centred || std::fabs( fd.drive.hz / tone.hz - 1.0 ) < 1e-9 ) && std::fabs( fd.drive.hz - tone.hz ) <= 0.5 * binHz + 1e-9;
+			wrong += !ok;
+			if( tone.centred )
+				worstSemis = std::max( worstSemis, std::fabs( semis ) );
+			else if( std::fabs( fd.drive.hz - tone.hz ) > worstOff )
+			{
+				worstOff       = std::fabs( fd.drive.hz - tone.hz );
+				worstOffCentre = holds;
+			}
+			if( !ok )
+				what += fmt( " %.2f Hz -> bin %d at %.2f Hz (%+.2f semitones; want bin %d at %.2f), F0 %.3g N;", tone.hz, fd.drive.bin, fd.drive.hz, semis, holds,
+				             centre, fd.drive.F0 );
+		}
+		const double read = rig->plugin.Audio().HostRate();
+		const std::string who = fmt( "%s, %s %d Hz", pass.over ? "SW Eido Over" : "SW Eidophone", pass.sendRate ? "the host says" : "the host never says; the bins at", pass.rate );
+		Check( wrong == 0 && read == pass.rate,
+		       fmt( "%s: the bins read at %.0f Hz; 5 sines at bin centres drive the plate at their own pitch (worst %.2g semitones), 4 others at "
+		            "the centre of the bin holding them (worst %.1f Hz off, bin %d, half a bin is %.1f), w = 2 pi f, the grains' w the drive's, "
+		            "over a louder 49 Hz bass in bin 0 (%d wrong:%s)",
+		            who.c_str(), read, worstSemis, worstOff, worstOffCentre, 0.5 * binHz, wrong, what.empty() ? " none" : what.c_str() ) );
+	}
+	//A rate no engine runs at is not one; and Bin Law's default is Linear, the
+	//law Arena was measured to use (Log puts the same tone elsewhere).
+	{
+		Rig fresh( false );
+		if( !startRig( fresh, raster.w, raster.h, perturb ) )
+			return 1;
+		fresh.plugin.SetSampleRate( 0u );
+		const float lawDefault = fresh.plugin.GetById( PT_BIN_LAW );
+		fresh.Set( PT_DEVICE, 0.0f );
+		const Tone tone = { 3.5 * 48000.0 / 128.0, true };
+		if( !drive( fresh, 48000, tone ) )
+			return 1;
+		const double linearHz = fresh.plugin.LastFrame().drive.hz, read = fresh.plugin.Audio().HostRate();
+		fresh.Set( PT_BIN_LAW, static_cast< float >( BinLaw::Log ) );
+		if( !drive( fresh, 48000, tone ) )
+			return 1;
+		const double logHz = fresh.plugin.LastFrame().drive.hz;
+		Check( read == 48000.0 && lawDefault == static_cast< float >( BinLaw::Linear ) && std::fabs( linearHz / tone.hz - 1.0 ) < 1e-9
+		           && std::fabs( logHz / ( 20.0 * std::pow( 24000.0 / 20.0, 3.5 / 64.0 ) ) - 1.0 ) < 1e-9,
+		       fmt( "a host rate of 0: the bins stay at %.0f Hz (want 48000); Bin Law's default is %s, the measured law: a %.1f Hz sine drives at "
+		            "%.1f Hz under it, at %.1f Hz under Log (%+.1f semitones; Log is kept for unmeasured hosts)",
+		            read, lawDefault == static_cast< float >( BinLaw::Linear ) ? "Linear" : "NOT Linear", tone.hz, linearHz, logHz,
+		            12.0 * std::log2( logHz / tone.hz ) ) );
 	}
 	return Verdict();
 }
@@ -2169,7 +2408,7 @@ const std::vector< CheckEntry >& checks()
 		{ "device", runDevice, false },      { "select", runSelect, false },  { "threshold", runThreshold, false }, { "hop", runHop, false },
 		{ "nodal", runNodal, false },        { "powder", runPowder, false },  { "level", runLevel, false },    { "freeze", runFreeze, false }, { "redraw", runRedraw, false },
 		{ "alpha", runAlpha, false },        { "splat", runSplat, false },    { "clock", runClock, false },    { "resize", runResize, false }, { "state", runState, false },
-		{ "names", runNames, true },         { "cues", runCues, true },
+		{ "names", runNames, true },         { "cues", runCues, true },       { "hostfft", runHostFft, false },
 	};
 	return list;
 }
@@ -2207,6 +2446,10 @@ int runNegative( bool offlineOnly = false )
 	add( "audio", runAudio, "the pitch in Hz taken as rad/s", []( Perturb& p ) { p.hooks = kHookHzAsOmega; } );
 	add( "audio", runAudio, "the fallback lets bin 0 win", []( Perturb& p ) { p.hooks = kHookBinZero; } );
 	add( "audio", runAudio, "the running peak never released", []( Perturb& p ) { p.hooks = kHookPeakHeld; } );
+	add( "audio", runAudio, "the host's bins read at 44.1 kHz whatever the host says (v0.1.0's)", []( Perturb& p ) { p.hooks = kHookAssumed441; } );
+	add( "hostfft", runHostFft, "the host's bins read at 44.1 kHz whatever the host says (v0.1.0's)", []( Perturb& p ) { p.hooks = kHookAssumed441; } );
+	add( "hostfft", runHostFft, "the host's sample rate never reaches the bins' axis", []( Perturb& p ) { p.hooks = kHookIgnoreHostRate; } );
+	add( "hostfft", runHostFft, "the fallback lets bin 0 win", []( Perturb& p ) { p.hooks = kHookBinZero; } );
 	add( "device", runDevice, "the menu values devices by position, not by name", []( Perturb& p ) { p.hooks = kHookMenuByIndex; } );
 	add( "select", runSelect, "the pitch in Hz taken as rad/s", []( Perturb& p ) { p.hooks = kHookHzAsOmega; } );
 	add( "threshold", runThreshold, "grains hop at a > g/2", []( Perturb& p ) { p.hooks = kHookHalfGate; } );

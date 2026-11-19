@@ -546,6 +546,11 @@ FFResult EidophonePlugin::ProcessOpenGL( ProcessOpenGLStruct* pgl )
 			bins[ i ] = info->elements[ static_cast< size_t >( i ) ].value;
 	}
 	const BinLaw law = static_cast< BinLaw >( OptionIndex( params[ PT_BIN_LAW ], static_cast< int >( BinLaw::Count ) ) );
+	//Resolume's bins are on the axis of its audio engine's rate (375 Hz a bin
+	//at Arena's 48 kHz, measured), handed to earshot before they are read.
+	//Until the host sends a rate, earshot's 48 kHz.
+	if( !( hooks & kHookIgnoreHostRate ) )
+		audio.SetHostRate( hostRate.load( std::memory_order_relaxed ) );
 	frame.drive      = audio.Update( now, bins, binCount, ClarityFromParam( params[ PT_CLARITY ] ), law );
 	//Gain is the steady peak acceleration the loudest recent level gives at
 	//this frequency, so a note between modes shakes the plate as visibly as
@@ -671,6 +676,14 @@ FFResult EidophonePlugin::SetTime( double time )
 {
 	hostTime = time;
 	return FF_SUCCESS;
+}
+
+void EidophonePlugin::SetSampleRate( unsigned int rate )
+{
+	//The SDK's own copy (CFFGLPlugin::sampleRate) starts uninitialised, so the
+	//plugin keeps its own.
+	CFFGLPlugin::SetSampleRate( rate );
+	hostRate.store( rate, std::memory_order_relaxed );
 }
 
 char* EidophonePlugin::GetTextParameter( unsigned int index )

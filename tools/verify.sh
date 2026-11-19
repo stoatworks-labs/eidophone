@@ -189,9 +189,11 @@ step "Checks (this Mac's GPU, 1280x720 and 320x180)"
 # Every claim the README makes, in the order the README makes them. Each GL
 # check runs at 1280x720 and 320x180 itself, except --level and --clock
 # (320x180: the field lattice and the clock do not depend on the raster),
-# --resize (640x360 to 320x180 and 320x240) and --state (GL state at
-# 320x180). modes, circle, plate, audio, names and cues need no GL context.
-CHECKS="modes circle plate audio device select threshold hop nodal powder level freeze redraw alpha splat clock resize state names cues"
+# --resize (640x360 to 320x180 and 320x240), --state (GL state at
+# 320x180) and --hostfft (the drive on Resolume's FFT, at 320x180; the audio
+# path, so on the GPU only). modes, circle, plate, audio, names and cues need
+# no GL context.
+CHECKS="modes circle plate audio hostfft device select threshold hop nodal powder level freeze redraw alpha splat clock resize state names cues"
 for check in $CHECKS; do
 	if out=$( "$EDTEST" --$check 2>&1 ); then
 		printf '   ok   edtest --%s: %s checks\n' "$check" "$( printf '%s\n' "$out" | grep -c '^  ok' )"

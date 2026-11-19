@@ -13,9 +13,11 @@
 > grain-substeps where the plate's acceleration is under g, **0** grains changed in any bit;
 > over 4,484,878 above it, **0** stayed put. Driven in one mode, **100%** of the sand
 > settles on that mode's nodal lines, square and circle. A sine at a mode's frequency, fed
-> through earshot's pitch tracker, puts 65–91% of the plate's energy in that mode. **21**
-> deliberately wrong models and **26** one-character mutants of the shipped GLSL and C++
-> are all caught. How a grain hops, how powder is carried, and the plate's damping are
+> through earshot's pitch tracker, puts 65–91% of the plate's energy in that mode. On
+> Resolume's FFT, bins built the way Arena was measured to build them drive the plate at the
+> centre of the bin holding the note, at 48 and at 44.1 kHz (v0.1.1; v0.1.0 was 1.47 semitones
+> flat in Arena). **25** deliberately wrong models and **29** one-character mutants of the
+> shipped GLSL and C++ are all caught. How a grain hops, how powder is carried, and the plate's damping are
 > **assumptions**: see [Status](#status).
 
 A Chladni plate with sand on it, sounded by the music, for [Resolume](https://resolume.com)
@@ -147,15 +149,18 @@ passage more than about 22 dB under the recent peak leaves the plate under g and
 frozen.
 
 **Device.** On "Resolume FFT (no pitch)" the plate gets only what Resolume's audio FFT gives:
-64 bins and no pitch, so the note is a guess from the loudest bin (under Linear the bins are
-345 Hz wide, and every bass note lands in the first two). Choose a capture device, a loopback
+64 bins and no pitch, so the note is a guess from the loudest bin, at its centre. In Arena the
+bins are 375 Hz wide, 0–24 kHz (its audio engine runs at 48 kHz; the plugin takes the rate
+Resolume reports), so every bass note lands in the first two and the plate rings at 562.5 Hz,
+937.5 Hz, 1312.5 Hz and so on. Bin Law Linear, the default, is that layout; Log is for a host
+that lays its bins out logarithmically, and in Arena puts the note far too low. Choose a capture device, a loopback
 of the music or a microphone, and earshot gives a real pitch. A device that's missing shows
 an amber rim on the plate; one that's open but silent (no microphone permission gives zeros,
 not an error) a pulsing red one.
 
 ## Status
 
-**v0.1.0, 18 November 2026, the first release, and early days. Run in Resolume only briefly, in
+**v0.1.1, 19 November 2026 (v0.1.0 was 18 November), and early days. Run in Resolume only briefly, in
 Arena on a Mac and on a Windows VM; on the Mac Resolume's FFT throws the sand with music playing,
 and no live audio device has ever been opened.** `oxbow probe` reads the bundles as a host does (`SW Eidophone` /
 `ED01` / source, `SW Eido Over` / `ED02` / effect) and `oxbow selftest` renders through each.
@@ -165,7 +170,7 @@ and no presets.
 ### Measured offline, on macOS
 
 `tools/verify.sh` passes on this machine (Apple Silicon, macOS 26) against a fresh universal
-Release build (18 November 2026, two and a half minutes). It runs every GL check at **two rasters**,
+Release build (19 November 2026, v0.1.1, two and a half minutes). It runs every GL check at **two rasters**,
 1280×720 and 320×180, and seven of them again on **Apple's software renderer** at 320×180.
 What it establishes:
 
@@ -174,7 +179,8 @@ What it establishes:
 | `--modes` | the free square: Iguchi's nine doubly-symmetric eigenvalues (Leissa's Table 4.65) to **3.4e-5** relative; all 20 values of Leissa's Table 4.67 inside its lower and upper bounds; the lowest, 14.11608, inside the 14.1028–14.1165 bracket; below all six of Ritz's 1909 values; converged to 2.8e-9 and orthonormal to 5.8e-15 |
 | `--circle` | the Bessel roots of Leissa's eq. 2.14 against an independent polar Rayleigh–Ritz solve to **6.6e-10**; Leissa's Table 2.6 to 0.31% and Table 2.5 to 0.74%; Table 2.7's nodal radii to 0.0005; Chladni's law approached monotonically, within 0.37% at ten circles |
 | `--plate` | every mode on the damped oscillator's closed-form steady state to **9.5e-16**; the rigid shake F/M to 2.2e-16; the ring-down to 2.2e-19; the same at 24, 30, 60 and 240 fps to 2.3e-12; pushed at the centre, only the 19 doubly-symmetric modes move |
-| `--audio` | a 440 Hz sine at −20 dBFS gives ω = 2π × 440.00 Hz and −20.00 dBFS; 20 dB down for 2 s, the drive 0.1284 of full against the 8 s release's closed form 0.1284; silence holds the note; the FFT fallback picks the loudest bin other than bin 0, at its centre under each Bin Law |
+| `--audio` | a 440 Hz sine at −20 dBFS gives ω = 2π × 440.00 Hz and −20.00 dBFS; 20 dB down for 2 s, the drive 0.1284 of full against the 8 s release's closed form 0.1284; silence holds the note; the FFT fallback picks the loudest bin other than bin 0, at its centre under each Bin Law, on the host's axis: 48 kHz until the host says otherwise, then 44.1, 48 or 96 kHz as it says |
+| `--hostfft` | **Resolume's FFT, through the plugin** (v0.1.1): a sine over a louder bass, made into 64 bins the way Arena 7.29.0 was measured to make them (a 2048-point Hann FFT, 16 fine bins a bin, held 2048 samples) and handed to the plugin as its FFT buffer with the host's rate by `SetSampleRate`. At 48 kHz and at 44.1 kHz, both plugins: five sines at bin centres drive the plate at their own pitch (**0** semitones off), and A4, A5, A6 and C8 at the centre of the bin holding them (at most 126.5 Hz off at 48 kHz, half a bin being 187.5; 134.9 at 44.1 kHz, of 172.3); with no rate sent, 48 kHz. v0.1.0's code fails it: every 48 kHz note **1.47 semitones flat** |
 | `--select` | a sine at a mode's frequency, through earshot's pitch tracker, gives that mode **91.3%**, **89.8%** and **65.3%** of the plate's elastic energy (160, 201 and 371 Hz), the largest share each time |
 | `--threshold` | over 20 substeps of a two-mode field: **0** of 757,980 grain-substeps under g changed in any bit; **0** of 4,484,878 over g stayed put |
 | `--hop` | 614,228 thrown grain-substeps: after the drift, the residual's mean is +0.0001 σ along the gradient and −0.0009 σ across, its variance **1.0001** of the model's |
@@ -188,8 +194,8 @@ What it establishes:
 | `--clock`, `--resize`, `--state`, `--redraw` | at a 499,000,000 ms host clock the frames stay 1/60 s apart to 6e-11 s; a raster change mid-run is **0 bytes** different from a fresh instance; the host's GL state comes back; a repeated host time runs no substep |
 | `--names`, `--cues` | 24 and 25 parameters (23 and 24 before the About block's User guide button), within FFGL's 16 characters, unique, the About block last; a cue sheet ramps and steps them |
 | `--pipe` | both plugins: 2.5 frames in, exactly 2 out; a closed stdout (`\| head -c 1`) exits 1, not 141 |
-| `--negative` | **21** deliberately wrong models, **21** caught |
-| mutation | **26** one-character mutants of the shipped GLSL and C++, **26** caught |
+| `--negative` | **25** deliberately wrong models, **25** caught |
+| mutation | **29** one-character mutants of the shipped GLSL and C++, **29** caught |
 | `tools/sweep.py` | all **17** controls of the source and **18** of the Over that have pixels measurably change the picture |
 | shaders | all 7 compile through `glslc`, not merely through Apple's driver |
 | the bundles | both universal (`x86_64 arm64`), export `plugMain`, ad-hoc sign; `oxbow` reads their name, id and type and renders through both |
@@ -245,6 +251,19 @@ peak.
   stayed where it had landed. **Arena's Audio setting decides what they hear:** on External
   (Arena's own audio input) nothing moved, 0 of 24 pairs for each plugin, and the Over on Local
   (over a picture-only card, so hearing nothing) lay still too.
+- **v0.1.1 drives the plate at the frequency Resolume's bins hold** (19 November 2026, a
+  pre-tag universal build signed ad hoc, the same set-up). Each plugin's log reads "host audio
+  at 48000 Hz: Resolume's FFT bins are 375.0 Hz each", and names the bin and frequency once a
+  note has held a second. Sines made for the check, on the layer below: **1312.5 Hz** (bin 3's
+  centre) drove the plate at **1312.5 Hz**, from a 48 kHz WAV and from a 44.1 kHz one alike
+  (Arena's engine is 48 kHz either way), and 880 Hz at 937.5 Hz, the centre of the bin holding
+  it; v0.1.0 read them at 1205.9 and 861.3 Hz. When each tone started the sand moved in 19 of 19
+  pairs on both plugins; the 44.1 kHz copy of the same tone, played next, moved it about a
+  twentieth as far, the sand already lying on that mode's lines, and 880 Hz, another mode, threw
+  it again. With the demo loops: `Beat 001.wav` 15 of 19 pairs (Over) and 9 of 19 (source) at
+  12 g, 19 and 19 at 40 g; `Bass 001.wav` 13 and 12 at 12 g, 16 and 16 at 40 g; silence, a
+  cleared layer, Local and External 0. Both register with every control as declared and the
+  About line `Eidophone v0.1.1 - MIT - Stoatworks Labs, stoatworks-labs.com`.
 - **Windows: Arena 7.27.1 on win-lab** (Mesa llvmpipe, no GPU, no sound device), with this
   release's own x64 DLLs, from its `.zip`, and before the tag with the release workflow's
   pre-tag build: the fleet's Arena gate passed **15** checks, failed none and skipped 4, the

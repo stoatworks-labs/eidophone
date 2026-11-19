@@ -52,6 +52,9 @@ MUTANTS=(
 	"source/Modes.cpp|b.a2 = l * l * l * Jp + g * n2 * ( l * Jp - J );|b.a2 = l * l * l * Jp - g * n2 * ( l * Jp - J );|--circle|C++: the circle's shear condition with - ( 1 - nu ) n^2, + -> -"
 	"source/Audio.h|constexpr double kPeakRelease = 8.0;|constexpr double kPeakRelease = 9.0;|--audio|C++: the running peak released at 9 s, 8 -> 9"
 	"source/Audio.cpp|const double u       = ( j + 0.5 ) / std::max( 1, bins );|const double u       = ( j + 0.6 ) / std::max( 1, bins );|--audio|C++: a bin's centre a tenth of a bin high, 5 -> 6"
+	"source/Audio.cpp|const double nyquist = 0.5 * sampleRate;|const double nyquist = 0.6 * sampleRate;|--audio|C++: the bins' axis to 0.6 of the host's rate, not its Nyquist, 5 -> 6"
+	"source/Audio.cpp|if( rate < 8000 |if( rate > 8000 |--audio|C++: every host rate refused, the bins left at 48 kHz, < -> >"
+	"source/Eidophone.cpp|if( !( hooks & kHookIgnoreHostRate ) )|if(  ( hooks & kHookIgnoreHostRate ) )|--hostfft|C++: the host's rate never handed to earshot, ! -> space"
 	"source/Audio.cpp|else if( value == earshot::deviceKey( earshot::kDefaultDevice ) )|else if( value != earshot::deviceKey( earshot::kDefaultDevice ) )|--device|C++: every device opened as the system default, = -> !"
 	"source/Eidophone.cpp|substepClock       = std::max( 0.0, total - substeps * shaders::kSubstep );|substepClock       = std::max( 0.0, total + substeps * shaders::kSubstep );|--clock|C++: the substep clock keeping what it ran, - -> +"
 )

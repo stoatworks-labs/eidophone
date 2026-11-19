@@ -20,7 +20,7 @@ square round the middle](eidophone.png)
 *One frame of SW Eidophone on its defaults, from the offline harness, not captured from
 Resolume: Resolume's bundled `Beat 001` music, 7.5 s in.*
 
-> **Before you rely on this:** it's at **v0.1.0**, the first release, and early days. What's
+> **Before you rely on this:** it's at **v0.1.1**, the second release, and early days. What's
 > established is established offline, on an Apple Silicon Mac (macOS 26), by a harness that
 > drives the plugins' own classes in a headless GL context, at two rasters and partly on Apple's
 > software renderer, and feeds them music through the same path a device would use. The square
@@ -28,8 +28,10 @@ Resolume: Resolume's bundled `Beat 001` music, 7.5 s in.*
 > published bounds; the round plate's agree with an independent solver to 6.6 × 10⁻¹⁰. Over
 > 757,980 grain-steps where the plate's acceleration was under g, no grain moved at all; over
 > 4,484,878 above it, every one did. Driven in one mode, all the sand settles on that mode's
-> nodal lines. Twenty-one models that are wrong on purpose and twenty-six one-character changes
-> to the shipped code are all caught.
+> nodal lines. Twenty-five models that are wrong on purpose and twenty-nine one-character changes
+> to the shipped code are all caught. On Resolume's own sound analysis, a tone at the centre of
+> one of its bands now drives the plate at that tone's pitch, at 48 kHz and at 44.1 kHz (v0.1.0
+> read every band 1.47 semitones flat in Arena).
 > In Resolume it has run only briefly: in Arena 7.27.1 on Windows on software rendering, where
 > the fleet's Arena gate passed 15 of 15 (4 skipped: that machine has no sound device, so the
 > controls that need sound weren't tried), and in Arena 7.29.0 on a Mac, where both plugins
@@ -117,8 +119,9 @@ stem](guide-figures-2.png)
 
 *Left: **a held synth note** (Synth 003, a held 262 Hz): a higher mode, a busier figure.
 Right: **Resolume's FFT, no device**: the harness's stand-in for Resolume's sound analysis
-with one band loud. The note is a guess at that band's centre (517 Hz under Linear), so the
-plate draws whatever it rings at there.*
+with one band loud. The note is a guess at that band's centre, so the plate draws whatever it
+rings at there: 517 Hz under Linear when this was made, on v0.1.0's 44.1 kHz reading; in
+v0.1.1, on Arena's 48 kHz, that band's centre is 562.5 Hz, so in Resolume the figure is another.*
 
 What falls out of the physics, and what to expect:
 
@@ -143,9 +146,11 @@ What falls out of the physics, and what to expect:
 **Device** chooses what pushes the plate. Its first entry, **"Resolume FFT (no pitch)"**, is
 Resolume's own audio analysis, the 64 bands it hands every audio-reactive effect: no device is
 opened, but there is no pitch either, so the plugin guesses the note from the loudest band
-(other than the lowest) and drives the plate at that band's centre. Under **Bin Law** Linear the
-bands are 345 Hz wide and every bass note lands in the first two, so the figures you get on
-Resolume's FFT are few and high. Which of Resolume's audio the bands carry is Resolume's
+(other than the lowest) and drives the plate at that band's centre. In Arena 7.29.0 on a Mac
+the bands were measured: 64 of them, each 375 Hz wide, from 0 to 24 kHz (Arena's audio runs at
+48 kHz, even for a 44.1 kHz clip), so their centres are 562.5 Hz, 937.5 Hz, 1312.5 Hz and so on.
+The plugin reads the band width from the audio rate Resolume reports to it. Every bass note lands
+in the first two bands, so the figures you get on Resolume's FFT are few and high. Which of Resolume's audio the bands carry is Resolume's
 **Audio** setting, which Resolume adds to both plugins as to any audio-reactive effect.
 **Composition** (the default) hears every clip playing in the composition. **Local** hears only
 the clip the plugin is on: the Over on a clip with its own sound track hears that sound, and over
@@ -154,7 +159,11 @@ input (Resolume's Preferences, under Audio), which in the Mac test heard nothing
 sound if its file has a sound track: Resolume's demo `.mov` clips are picture only, and their
 sound is in the matching `.wav` files. In Arena 7.29.0 on a Mac, Arena's demo drum loop
 `Beat 001.wav` on Composition made the grains hop on its hits at the default Gain, and at 40 g
-the source's sand began to gather into a figure.
+the source's sand began to gather into a figure. With a steady test tone at 1312.5 Hz playing
+instead, v0.1.1 drove the plate at exactly 1312.5 Hz, whether the tone's file was at 48 kHz or
+44.1 kHz, and an 880 Hz tone at 937.5 Hz, the centre of its band (v0.1.0 drove them at 1206 Hz
+and 861 Hz). The plugin's log names the band and frequency once a note has held for a second
+(see [If it looks wrong](#if-it-looks-wrong)).
 
 The rest of the menu is **"System default"** and then your capture devices, each remembered by
 **name**, so a composition opened on another day or machine finds the same device if it's
@@ -227,7 +236,9 @@ the music counts as notes and the figure changes more often; higher, only clear 
 change it. Between notes the last note is held. Clarity does nothing on Resolume's FFT.
 
 **Bin Law** is how Resolume's 64 bands map to frequency, Linear or Log; it acts only on
-"Resolume FFT (no pitch)".
+"Resolume FFT (no pitch)". Leave it on **Linear**, the default: that is how Arena lays its bands
+out (measured in Arena 7.29.0). Log spreads the same 64 bands from 20 Hz to the top, which is not
+Arena's: a tone in Arena's fourth band (1312.5 Hz) would drive the plate at 29.5 Hz under Log.
 
 ---
 
@@ -383,6 +394,12 @@ macOS    ~/Library/Logs/eidophone/eidophone.YYYY-MM-DD.log
 Windows  %LOCALAPPDATA%\eidophone\logs\eidophone.YYYY-MM-DD.log
 ```
 
+**Which note is Resolume's FFT driving?** The same log says. When the plugin loads it records the
+audio rate Resolume reports, such as "host audio at 48000 Hz: Resolume's FFT bins are 375.0 Hz
+each", and on "Resolume FFT (no pitch)", once the same band has been the loudest for a second, it
+records the band and the frequency the plate is being driven at, such as "Resolume FFT note held
+1 s: bin 3, 1312.5 Hz".
+
 ---
 
 ## Known limits
@@ -395,8 +412,8 @@ Windows  %LOCALAPPDATA%\eidophone\logs\eidophone.YYYY-MM-DD.log
   analysis, in Arena 7.29.0 on a Mac: a drum loop made the grains hop at the default Gain. No
   full mix has been played to it there.
 - **Resolume's FFT has no pitch.** On "Resolume FFT (no pitch)" the note is a guess from the
-  loudest band, its centre, so the plate rings at a handful of fixed frequencies (517 Hz, 861 Hz
-  and so on under Linear), not at the music's notes.
+  loudest band, its centre, so the plate rings at a handful of fixed frequencies (562.5 Hz,
+  937.5 Hz and so on in Arena, under Linear), not at the music's notes.
 - **The loudness law is relative.** The note is earshot's pitch, held between notes; the
   loudness is the RMS of earshot's band envelopes, whether or not the sound is a note; and Gain
   is the plate's peak acceleration at the loudest passage of the last 8 s or so. That is what made

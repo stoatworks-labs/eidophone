@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -33,6 +34,14 @@ earshot::Config makeConfig()
 	c.maxChannels = 2;
 	return c;
 }
+
+/// A frequency for the log, to 0.1 Hz.
+std::string fmtHz( double hz )
+{
+	char text[ 32 ];
+	std::snprintf( text, sizeof( text ), "%.1f", hz );
+	return text;
+}
 } // namespace
 
 double BinHz( int j, BinLaw law, double sampleRate, int bins )
@@ -45,7 +54,7 @@ double BinHz( int j, BinLaw law, double sampleRate, int bins )
 	return u * nyquist;
 }
 
-Drive DriveFrom( const earshot::Frame& frame, const float* bins, int binCount, BinLaw law, double previousOmega, int hooks )
+Drive DriveFrom( const earshot::Frame& frame, const float* bins, int binCount, BinLaw law, double hostRate, double previousOmega, int hooks )
 {
 	Drive d;
 	d.omega = previousOmega;
@@ -101,7 +110,9 @@ Drive DriveFrom( const earshot::Frame& frame, const float* bins, int binCount, B
 		return d;
 	d.note     = true;
 	d.bin      = best;
-	d.hz       = BinHz( best, law, earshot::HostBins().sampleRate, binCount );//44.1 kHz, assumed
+	//On the host's axis: bin j spans [j, j+1) x rate / 128 under Linear
+	//(375 Hz at Arena's 48 kHz engine, measured), so its centre is the note.
+	d.hz       = BinHz( best, law, ( hooks & kHookAssumed441 ) ? 44100.0 : hostRate, binCount );
 	d.omega    = 2.0 * kPi * d.hz;
 	d.loudness = bestValue;
 	return d;
@@ -125,10 +136,11 @@ const char* AudioInput::HostLabel()
 
 AudioInput::AudioInput()
 {
+	wanted = makeConfig();
 	if( g_factory != nullptr )
-		engine = std::make_unique< earshot::Engine >( makeConfig(), g_factory() );
+		engine = std::make_unique< earshot::Engine >( wanted, g_factory() );
 	else
-		engine = std::make_unique< earshot::Engine >( makeConfig() );
+		engine = std::make_unique< earshot::Engine >( wanted );
 	if( !engine->ok() )
 		diag::error( "earshot could not allocate: the plate will not be driven" );
 	Refresh();
@@ -223,13 +235,30 @@ void AudioInput::Feed( const float* interleaved, int frames, int rate, int chann
 	engine->feed( interleaved, frames );
 }
 
+void AudioInput::SetHostRate( unsigned int rate )
+{
+	if( rate < 8000 || rate > 768000 || rate == hostRate )
+		return;
+	hostRate                    = rate;
+	wanted.hostBins.sampleRate  = static_cast< double >( rate );
+	engine->configure( wanted );
+	diag::info( "host audio at " + std::to_string( rate ) + " Hz: Resolume's FFT bins are " + fmtHz( rate / 128.0 ) + " Hz each" );
+}
+
+double AudioInput::HostRate() const
+{
+	return engine->config().hostBins.sampleRate;
+}
+
 Drive AudioInput::Update( double hostSeconds, const float* bins, int binCount, double clarity, BinLaw law )
 {
+	//One Config for every change: earshot applies a configure() at the next
+	//update(), and a second one before that replaces the first, so Clarity
+	//built on engine->config() would undo a host rate set this frame.
 	if( clarity != appliedClarity )
 	{
-		earshot::Config c = engine->config();
-		c.pitchClarity    = static_cast< float >( clarity );
-		engine->configure( c );
+		wanted.pitchClarity = static_cast< float >( clarity );
+		engine->configure( wanted );
 		appliedClarity = clarity;
 	}
 	const earshot::Frame& f = engine->update( hostSeconds, bins, binCount );
@@ -256,8 +285,26 @@ Drive AudioInput::Update( double hostSeconds, const float* bins, int binCount, d
 		generation = f.generation;
 		lastOmega  = 0.0;
 	}
-	Drive d   = DriveFrom( f, bins, binCount, law, lastOmega, hooks );
-	lastOmega = d.omega;
+	const double rate = engine->config().hostBins.sampleRate;
+	Drive d           = DriveFrom( f, bins, binCount, law, rate, lastOmega, hooks );
+	lastOmega         = d.omega;
+	//The fallback's note, logged once it has held a second (a tone, a held
+	//chord): what frequency Resolume's FFT is driving the plate at. Once per
+	//held note: again only for another bin, or after silence (Arena's bins
+	//are exactly 0 then, and no bin is taken).
+	if( d.bin < 0 )
+		loggedBin = -1;
+	if( d.bin != heldBin )
+	{
+		heldBin   = d.bin;
+		heldSince = hostSeconds;
+	}
+	else if( heldBin >= 0 && heldBin != loggedBin && hostSeconds - heldSince >= 1.0 )
+	{
+		loggedBin = heldBin;
+		diag::info( "Resolume FFT note held 1 s: bin " + std::to_string( heldBin ) + ", " + fmtHz( d.hz ) + " Hz (" + std::string( law == BinLaw::Log ? "Log" : "Linear" )
+		            + ", bins on a " + std::to_string( static_cast< long >( rate ) ) + " Hz axis)" );
+	}
 	const double dt = lastSeconds >= 0.0 ? hostSeconds - lastSeconds : 0.0;
 	lastSeconds     = hostSeconds;
 	peak            = ReleasePeak( peak, d.loudness, dt, hooks );
